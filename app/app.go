@@ -10,18 +10,6 @@ import (
 const windowWidth = 1920
 const windowHeight = 1080
 
-const fontSize = 24
-
-const (
-	FRegular = iota
-	FSemibold
-	FBold
-
-	FEndWeights
-)
-
-var font [FEndWeights]rl.Font
-
 func Main() {
 	// rl.SetConfigFlags(rl.FlagWindowResizable)
 
@@ -35,10 +23,6 @@ func Main() {
 
 	rl.SetTargetFPS(int32(rl.GetMonitorRefreshRate(rl.GetCurrentMonitor())))
 
-	font[FRegular] = rl.LoadFontEx("assets/Inter-Regular.ttf", fontSize, nil)
-	font[FSemibold] = rl.LoadFontEx("assets/Inter-SemiBold.ttf", fontSize, nil)
-	font[FBold] = rl.LoadFontEx("assets/Inter-Bold.ttf", fontSize, nil)
-
 	arena := clay.CreateArenaWithCapacity(clay.MinMemorySize())
 	clay.Initialize(
 		arena,
@@ -46,9 +30,13 @@ func Main() {
 		clay.ErrorHandler{ErrorHandlerFunction: handleClayErrors},
 	)
 	clay.SetMeasureTextFunction(func(str string, config *clay.TextElementConfig, userData any) clay.Dimensions {
-		// TODO: Use font from command
-		dims := rl.MeasureTextEx(font[FRegular], str, float32(config.FontSize), float32(config.LetterSpacing))
-		return clay.Dimensions{dims.X, dims.Y}
+		fontSize := config.FontSize
+		if fontSize == 0 {
+			fontSize = DefaultFontSize
+		}
+		font := LoadFont(config.FontID, int(fontSize))
+		dims := rl.MeasureTextEx(font, str, float32(fontSize), float32(config.LetterSpacing))
+		return clay.Dimensions{Width: dims.X, Height: dims.Y}
 	}, nil)
 	clay.SetDebugModeEnabled(true)
 
@@ -121,8 +109,12 @@ func frame() {
 
 		case clay.RenderCommandTypeText:
 			text := cmd.RenderData.Text
-			// TODO: use font ID from command
-			rl.DrawTextEx(font[FRegular], text.StringContents, rl.Vector2(bbox.XY()), float32(text.FontSize), float32(text.LetterSpacing), text.TextColor.RGBA())
+			fontSize := text.FontSize
+			if fontSize == 0 {
+				fontSize = DefaultFontSize
+			}
+			font := LoadFont(text.FontID, int(fontSize))
+			rl.DrawTextEx(font, text.StringContents, rl.Vector2(bbox.XY()), float32(fontSize), float32(text.LetterSpacing), text.TextColor.RGBA())
 
 		// TODO: IMAGES
 
@@ -135,15 +127,6 @@ func frame() {
 		}
 	}
 	rl.EndDrawing()
-
-	// rl.BeginDrawing()
-	// {
-	// 	rl.ClearBackground(rl.RayWhite)
-	// 	drawText(font[FRegular], "Congrats! You created your first window!", 190, 200, rl.Black)
-	// 	drawText(font[FBold], "And this text is bold, which is swankier.", 190, 224, rl.Black)
-	// 	drawText(font[FSemibold], "This, on the other hand? Semibold. Half the swank, double the swagger.", 190, 248, rl.Black)
-	// }
-	// rl.EndDrawing()
 }
 
 var ColorLight = clay.Color{224, 215, 210, 255}
@@ -157,23 +140,23 @@ func ui() {
 			BackgroundColor: ColorLight,
 		}, func() {
 			clay.CLAY(clay.ID("ProfilePictureOuter"), clay.EL{Layout: clay.LAY{Sizing: clay.Sizing{Width: clay.SizingGrow(0, 0)}, Padding: clay.PaddingAll(16), ChildGap: 16, ChildAlignment: clay.ChildAlignment{Y: clay.AlignYCenter}}, BackgroundColor: ColorRed}, func() {
-				clay.TEXT("Clay - UI Library", clay.TextElementConfig{FontSize: 24, TextColor: clay.Color{255, 255, 255, 255}})
+				clay.TEXT("Clay - UI Library", clay.TextElementConfig{FontID: InterBold, FontSize: 24, TextColor: clay.Color{255, 255, 255, 255}})
 			})
 
-			for i := 0; i < 5; i++ {
+			for range 5 {
 				sidebarItemComponent()
 			}
 		})
-		clay.CLAY(clay.ID("MainContent"), clay.EL{Layout: clay.LAY{Sizing: clay.Sizing{Width: clay.SizingGrow(0, 0), Height: clay.SizingGrow(0, 0)}}, BackgroundColor: ColorLight})
+		clay.CLAY(clay.ID("MainContent"), clay.EL{Layout: clay.LAY{LayoutDirection: clay.TopToBottom, Sizing: clay.Sizing{Width: clay.SizingGrow(0, 0), Height: clay.SizingGrow(0, 0)}, Padding: clay.PaddingAll(16), ChildGap: 8}, BackgroundColor: ColorLight}, func() {
+			for f := range FontsEnd {
+				clay.TEXT(fontFiles[f], clay.TextElementConfig{FontID: f, TextColor: clay.Color{0, 0, 0, 255}})
+			}
+		})
 	})
 }
 
 func sidebarItemComponent() {
 	clay.CLAY_AUTO_ID(clay.EL{Layout: clay.LAY{Sizing: clay.Sizing{Width: clay.SizingGrow(0, 0), Height: clay.SizingFixed(50)}}, BackgroundColor: ColorOrange})
-}
-
-func drawText(font rl.Font, text string, x float32, y float32, color rl.Color) {
-	rl.DrawTextEx(font, text, rl.Vector2{X: x, Y: y}, fontSize, 0, color)
 }
 
 func handleClayErrors(errorData clay.ErrorData) {
