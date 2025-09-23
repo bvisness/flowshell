@@ -7,8 +7,8 @@ import (
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
-var screenWidth = float32(1920)
-var screenHeight = float32(1080)
+const windowWidth = 1920
+const windowHeight = 1080
 
 const fontSize = 24
 
@@ -23,15 +23,15 @@ const (
 var font [FEndWeights]rl.Font
 
 func Main() {
-	rl.SetConfigFlags(rl.FlagWindowResizable)
+	// rl.SetConfigFlags(rl.FlagWindowResizable)
 
-	rl.InitWindow(int32(screenWidth), int32(screenHeight), "Flowshell")
+	rl.InitWindow(windowWidth, windowHeight, "Flowshell")
 	defer rl.CloseWindow()
 
-	monWidth := float32(rl.GetMonitorWidth(rl.GetCurrentMonitor()))
-	monHeight := float32(rl.GetMonitorHeight(rl.GetCurrentMonitor()))
-	rl.SetWindowSize(int(monWidth*0.8), int(monHeight*0.8))
-	rl.SetWindowPosition(int(monWidth*0.1), int(monHeight*0.1))
+	monitorWidth := float32(rl.GetMonitorWidth(rl.GetCurrentMonitor()))
+	monitorHeight := float32(rl.GetMonitorHeight(rl.GetCurrentMonitor()))
+	// rl.SetWindowSize(windowWidth, windowHeight)
+	rl.SetWindowPosition(int(monitorWidth/2-windowWidth/2), int(monitorHeight/2-windowHeight/2))
 
 	rl.SetTargetFPS(int32(rl.GetMonitorRefreshRate(rl.GetCurrentMonitor())))
 
@@ -42,7 +42,7 @@ func Main() {
 	arena := clay.CreateArenaWithCapacity(clay.MinMemorySize())
 	clay.Initialize(
 		arena,
-		clay.Dimensions{screenWidth, screenHeight},
+		clay.Dimensions{windowWidth, windowHeight},
 		clay.ErrorHandler{ErrorHandlerFunction: handleClayErrors},
 	)
 	clay.SetMeasureTextFunction(func(str string, config *clay.TextElementConfig, userData any) clay.Dimensions {
@@ -59,7 +59,7 @@ func Main() {
 }
 
 func frame() {
-	clay.SetLayoutDimensions(clay.D{screenWidth, screenHeight})
+	clay.SetLayoutDimensions(clay.D{windowWidth, windowHeight})
 	clay.SetPointerState(
 		clay.V2{float32(rl.GetMouseX()), float32(rl.GetMouseY())},
 		rl.IsMouseButtonDown(rl.MouseButtonLeft),
