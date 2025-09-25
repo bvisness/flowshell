@@ -27,11 +27,14 @@ import "C"
 
 import (
 	"image/color"
+	"runtime"
 	"runtime/cgo"
 	"unsafe"
 
-	rl "github.com/gen2brain/raylib-go/raylib"
+	"github.com/bvisness/flowshell/util"
 )
+
+var pinner runtime.Pinner
 
 // ----------------------
 // Macros
@@ -518,18 +521,16 @@ type ImageElementConfig struct {
 }
 
 func (r ImageElementConfig) C() C.Clay_ImageElementConfig {
-	res := C.Clay_ImageElementConfig{
-		imageData: nil,
+	var imageHandlePtr unsafe.Pointer
+	if r.ImageData != nil {
+		imageHandle := cgo.NewHandle(r.ImageData)
+		imageHandlePtr = unsafe.Pointer(&imageHandle)
 	}
+	// pinner.Pin(&imageData)
 
-	// TODO: Should be a generic registry
-	switch img := r.ImageData.(type) {
-	case rl.Texture2D:
-		images[img.ID] = img
-		res.imageData = unsafe.Pointer(uintptr(img.ID))
+	return C.Clay_ImageElementConfig{
+		imageData: imageHandlePtr,
 	}
-
-	return res
 }
 
 // Controls where a floating element is offset relative to its parent element.
@@ -828,15 +829,10 @@ type ImageRenderData struct {
 }
 
 func ImageRenderData2Go(r C.Clay_ImageRenderData) ImageRenderData {
-	var imageData any
-	if r.imageData != nil {
-		imageData = images[uint32(uintptr(r.imageData))]
-	}
-
 	return ImageRenderData{
 		BackgroundColor: Color2Go(r.backgroundColor),
 		CornerRadius:    CornerRadius2Go(r.cornerRadius),
-		ImageData:       imageData,
+		ImageData:       util.Tern(r.imageData != nil, (*cgo.Handle)(r.imageData).Value(), nil),
 	}
 }
 
@@ -1243,7 +1239,6 @@ func SetDebugModeEnabled(enabled bool) {
 var errorHandlers = make(map[*C.Clay_Context]ErrorHandler)
 var measureTextUserData = make(map[*C.Clay_Context]any)
 var measureTextFuncs = make(map[*C.Clay_Context]MeasureTextFunction)
-var images = make(map[uint32]rl.Texture2D)
 
 //export clayErrorCallback
 func clayErrorCallback(errorText C.Clay_ErrorData) {

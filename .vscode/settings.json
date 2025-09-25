@@ -1,0 +1,10 @@
+{
+  "go.vetFlags": [
+    "-composites=false"
+  ],
+  "gopls": {
+    "analyses": {
+      "composites": false
+    }
+  },
+}
