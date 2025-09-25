@@ -25,6 +25,8 @@ import "C"
 import (
 	"image/color"
 	"unsafe"
+
+	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
 // ----------------------
@@ -474,9 +476,18 @@ type ImageElementConfig struct {
 }
 
 func (r ImageElementConfig) C() C.Clay_ImageElementConfig {
-	return C.Clay_ImageElementConfig{
-		// TODO: Another registry for image data I GUESS
+	res := C.Clay_ImageElementConfig{
+		imageData: nil,
 	}
+
+	// TODO: Should be a generic registry
+	switch img := r.ImageData.(type) {
+	case rl.Texture2D:
+		images[img.ID] = img
+		res.imageData = unsafe.Pointer(uintptr(img.ID))
+	}
+
+	return res
 }
 
 // Controls where a floating element is offset relative to its parent element.
@@ -775,10 +786,15 @@ type ImageRenderData struct {
 }
 
 func ImageRenderData2Go(r C.Clay_ImageRenderData) ImageRenderData {
+	var imageData any
+	if r.imageData != nil {
+		imageData = images[uint32(uintptr(r.imageData))]
+	}
+
 	return ImageRenderData{
 		BackgroundColor: Color2Go(r.backgroundColor),
 		CornerRadius:    CornerRadius2Go(r.cornerRadius),
-		ImageData:       r.imageData,
+		ImageData:       imageData,
 	}
 }
 
@@ -955,6 +971,7 @@ func (r ElementDeclaration) C() C.Clay_ElementDeclaration {
 		backgroundColor: r.BackgroundColor.C(),
 		cornerRadius:    r.CornerRadius.C(),
 		aspectRatio:     r.AspectRatio.C(),
+		image:           r.Image.C(),
 		floating:        r.Floating.C(),
 		custom:          r.Custom.C(),
 		clip:            r.Clip.C(),
@@ -1115,6 +1132,7 @@ func SetDebugModeEnabled(enabled bool) {
 var errorHandlers = make(map[*C.Clay_Context]ErrorHandler)
 var measureTextUserData = make(map[*C.Clay_Context]any)
 var measureTextFuncs = make(map[*C.Clay_Context]MeasureTextFunction)
+var images = make(map[uint32]rl.Texture2D)
 
 //export clayErrorCallback
 func clayErrorCallback(errorText C.Clay_ErrorData) {

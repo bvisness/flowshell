@@ -2,6 +2,7 @@ package app
 
 import (
 	"github.com/bvisness/flowshell/clay"
+	"github.com/bvisness/flowshell/util"
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
@@ -12,8 +13,9 @@ func renderClayCommands(commands []clay.RenderCommand) {
 		case clay.RenderCommandTypeRectangle:
 			config := cmd.RenderData.Rectangle
 			if config.CornerRadius.TopLeft > 0 {
-				// The official raylib renderer does some truly insane stuff here that I cannot understand.
-				rl.DrawRectangleRounded(rl.Rectangle(bbox), config.CornerRadius.TopLeft, 8, config.BackgroundColor.RGBA())
+				// Why we have to do this for Raylib I do not understand.
+				radius := config.CornerRadius.TopLeft * 2 / util.Tern(bbox.Width > bbox.Height, bbox.Height, bbox.Width)
+				rl.DrawRectangleRounded(rl.Rectangle(bbox), radius, 8, config.BackgroundColor.RGBA())
 			} else {
 				rl.DrawRectangle(int32(bbox.X), int32(bbox.Y), int32(bbox.Width), int32(bbox.Height), config.BackgroundColor.RGBA())
 			}
@@ -60,7 +62,21 @@ func renderClayCommands(commands []clay.RenderCommand) {
 			font := LoadFont(text.FontID, int(fontSize))
 			rl.DrawTextEx(font, text.StringContents, rl.Vector2(bbox.XY()), float32(fontSize), float32(text.LetterSpacing), text.TextColor.RGBA())
 
-		// TODO: IMAGES
+		case clay.RenderCommandTypeImage:
+			img := cmd.RenderData.Image
+			tex := img.ImageData.(rl.Texture2D)
+			tintColor := img.BackgroundColor
+			if tintColor.R == 0 && tintColor.G == 0 && tintColor.B == 0 && tintColor.A == 0 {
+				tintColor = clay.Color{255, 255, 255, 255}
+			}
+			rl.DrawTexturePro(
+				tex,
+				rl.Rectangle{0, 0, float32(tex.Width), float32(tex.Height)},
+				rl.Rectangle(cmd.BoundingBox),
+				rl.Vector2{},
+				0,
+				tintColor.RGBA(),
+			)
 
 		case clay.RenderCommandTypeScissorStart:
 			rl.BeginScissorMode(int32(bbox.X), int32(bbox.Y), int32(bbox.Width), int32(bbox.Height))

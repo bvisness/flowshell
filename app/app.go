@@ -20,8 +20,9 @@ func Main() {
 	monitorHeight := float32(rl.GetMonitorHeight(rl.GetCurrentMonitor()))
 	// rl.SetWindowSize(windowWidth, windowHeight)
 	rl.SetWindowPosition(int(monitorWidth/2-windowWidth/2), int(monitorHeight/2-windowHeight/2))
-
 	rl.SetTargetFPS(int32(rl.GetMonitorRefreshRate(rl.GetCurrentMonitor())))
+
+	loadImages()
 
 	arena := clay.CreateArenaWithCapacity(clay.MinMemorySize())
 	clay.Initialize(
