@@ -1,8 +1,6 @@
 package app
 
 import (
-	"fmt"
-
 	"github.com/bvisness/flowshell/clay"
 	"github.com/bvisness/flowshell/util"
 	rl "github.com/gen2brain/raylib-go/raylib"
@@ -17,7 +15,7 @@ var node = &Node{
 	ID:  1,
 	Pos: V2{100, 100},
 	Cmd: NodeCmd{
-		Cmd: "test --foo",
+		CmdString: "curl https://bvisness.me/about/",
 	},
 }
 
@@ -27,15 +25,41 @@ func loadImages() {
 	ImgPlay = rl.LoadTexture("assets/play.png")
 }
 
+var UICursor rl.MouseCursor
+
 func ui() {
 	clay.CLAY(clay.ID("Background"), clay.EL{
-		Layout: clay.LAY{
-			Sizing: clay.Sizing{Width: clay.SizingGrow(1, 0), Height: clay.SizingGrow(1, 0)},
-		},
+		Layout:          clay.LAY{Sizing: GROWALL},
 		BackgroundColor: Night,
+		Border: clay.BorderElementConfig{
+			Width: clay.BorderWidth{BetweenChildren: 1},
+			Color: Gray,
+		},
 	}, func() {
-		UINode(node)
+		clay.CLAY(clay.ID("NodeCanvas"), clay.EL{
+			Layout: clay.LAY{Sizing: GROWALL},
+		}, func() {
+			UINode(node)
+		})
+		clay.CLAY(clay.ID("Output"), clay.EL{
+			Layout: clay.LAY{Sizing: clay.Sizing{Width: clay.SizingFixed(600)}, Padding: PA2},
+		}, func() {
+			var output []byte
+			if err := node.Cmd.Err(); err != nil {
+				output = []byte(err.Error())
+			} else {
+				output = node.Cmd.CombinedOutput()
+			}
+			if len(output) == 0 {
+				output = []byte("No output yet")
+			}
+
+			clay.TEXT(string(output), clay.TextElementConfig{FontID: JetBrainsMono, FontSize: F3, TextColor: White})
+		})
 	})
+
+	rl.SetMouseCursor(UICursor)
+	UICursor = rl.MouseCursorDefault
 }
 
 func menu() {
@@ -81,11 +105,14 @@ func UINode(node *Node) {
 		}, func() {
 			clay.TEXT("Node", clay.TextElementConfig{FontID: InterSemibold, FontSize: F3, TextColor: White})
 			UISpacerH()
+			if node.Running {
+				clay.TEXT("Running...", clay.TextElementConfig{TextColor: White})
+			}
 			UIButton(clay.ID("PlayButton"),
-				clay.EL{Layout: clay.LAY{Padding: PA1}},
-				ButtonEvents{
+				UIButtonConfig{
+					El: clay.EL{Layout: clay.LAY{Padding: PA1}},
 					OnClick: func(elementID clay.ElementID, pointerData clay.PointerData, userData any) {
-						fmt.Println("Button clicked!")
+						node.Run()
 					},
 				},
 				func() {
@@ -103,36 +130,42 @@ func UINode(node *Node) {
 		clay.CLAY(clay.ID("NodeBody"), clay.EL{
 			Layout: clay.LAY{Sizing: GROWH, Padding: PA2},
 		}, func() {
-			UITextBox(clay.ID("Cmd"), &node.Cmd.Cmd, clay.EL{Layout: clay.LAY{Sizing: GROWH}})
+			UITextBox(clay.ID("Cmd"), &node.Cmd.CmdString, clay.EL{Layout: clay.LAY{Sizing: GROWH}})
 		})
 	})
 }
 
-type ButtonEvents struct {
-	OnHover  clay.OnHoverFunc
-	OnClick  clay.OnHoverFunc
-	UserData any
+type UIButtonConfig struct {
+	El clay.ElementDeclaration
+
+	OnHover         clay.OnHoverFunc
+	OnHoverUserData any
+
+	OnClick         clay.OnHoverFunc
+	OnClickUserData any
 }
 
-func UIButton(id clay.ElementID, decl clay.ElementDeclaration, events ButtonEvents, children ...func()) {
+func UIButton(id clay.ElementID, config UIButtonConfig, children ...func()) {
 	clay.CLAY_LATE(id, func() clay.ElementDeclaration {
-		decl.CornerRadius = RA1
-		decl.BackgroundColor = util.Tern(clay.Hovered(), clay.Color{255, 255, 255, 20}, clay.Color{})
+		config.El.CornerRadius = RA1
+		config.El.BackgroundColor = util.Tern(clay.Hovered(), clay.Color{255, 255, 255, 20}, clay.Color{})
 
 		clay.OnHover(func(elementID clay.ElementID, pointerData clay.PointerData, _ any) {
-			if events.OnHover != nil {
-				events.OnHover(elementID, pointerData, events.UserData)
+			UICursor = rl.MouseCursorPointingHand
+
+			if config.OnHover != nil {
+				config.OnHover(elementID, pointerData, config.OnHoverUserData)
 			}
 
 			// TODO: Check global UI state to see what UI component the click started on
 			if pointerData.State == clay.PointerDataReleasedThisFrame {
-				if events.OnClick != nil {
-					events.OnClick(elementID, pointerData, events.UserData)
+				if config.OnClick != nil {
+					config.OnClick(elementID, pointerData, config.OnClickUserData)
 				}
 			}
 		}, nil)
 
-		return decl
+		return config.El
 	}, children...)
 }
 
@@ -141,7 +174,12 @@ func UITextBox(id clay.ElementID, str *string, decl clay.ElementDeclaration) {
 	decl.Layout.Padding = PVH(S1, S2)
 	decl.BackgroundColor = DarkGray
 
-	clay.CLAY(id, decl, func() {
+	clay.CLAY_LATE(id, func() clay.EL {
+		if clay.Hovered() {
+			UICursor = rl.MouseCursorIBeam
+		}
+		return decl
+	}, func() {
 		clay.TEXT(*str, clay.TextElementConfig{TextColor: White})
 	})
 }
@@ -152,7 +190,7 @@ func UISpacerH() {
 
 func UITooltip(msg string) {
 	clay.CLAY(clay.ID("Tooltip"), clay.EL{
-		Floating:        clay.FloatingElementConfig{AttachTo: clay.AttachToRoot, Offset: clay.V2(rl.GetMousePosition()).Plus(clay.V2{0, 20})},
+		Floating:        clay.FloatingElementConfig{AttachTo: clay.AttachToRoot, Offset: clay.V2(rl.GetMousePosition()).Plus(clay.V2{0, 28})},
 		Layout:          clay.LAY{Padding: PA1},
 		BackgroundColor: DarkGray,
 		Border:          clay.BorderElementConfig{Color: Gray, Width: BA},

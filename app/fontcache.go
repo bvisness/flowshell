@@ -8,6 +8,7 @@ const (
 	InterRegular Font = iota
 	InterSemibold
 	InterBold
+	JetBrainsMono
 
 	FontsEnd
 )
@@ -16,6 +17,7 @@ var fontFiles = [FontsEnd]string{
 	"assets/Inter-Regular.ttf",
 	"assets/Inter-SemiBold.ttf",
 	"assets/Inter-Bold.ttf",
+	"assets/JetBrainsMono-Regular.ttf",
 }
 
 const DefaultFontSize = 16
