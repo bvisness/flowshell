@@ -6,7 +6,9 @@ var Night = clay.Color{12, 14, 17, 255}
 var Charcoal = clay.Color{20, 22, 25, 255}
 var DarkGray = clay.Color{33, 36, 40, 255}
 var Gray = clay.Color{67, 71, 79, 255}
+var LightGray = clay.Color{157, 161, 170, 255}
 var White = clay.Color{250, 250, 252, 255}
+var Red = clay.Color{214, 25, 50, 255}
 
 const S1 = 4
 const S2 = 8

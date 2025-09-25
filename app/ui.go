@@ -1,6 +1,8 @@
 package app
 
 import (
+	"fmt"
+
 	"github.com/bvisness/flowshell/clay"
 	"github.com/bvisness/flowshell/util"
 	rl "github.com/gen2brain/raylib-go/raylib"
@@ -12,9 +14,27 @@ const MenuMaxWidth = 0 // no max
 const NodeMinWidth = 360
 
 var node = &Node{
-	ID:  1,
-	Pos: V2{100, 100},
-	Cmd: NodeCmd{
+	ID:   1,
+	Pos:  V2{100, 100},
+	Name: "Run Process",
+
+	InputPorts: nil,
+	OutputPorts: []NodePort{
+		{
+			Name: "Stdout",
+			Type: FlowType{Kind: FSKindBytes},
+		},
+		{
+			Name: "Stderr",
+			Type: FlowType{Kind: FSKindBytes},
+		},
+		{
+			Name: "Combined Stdout/Stderr",
+			Type: FlowType{Kind: FSKindBytes},
+		},
+	},
+
+	Action: &CmdAction{
 		CmdString: "curl https://bvisness.me/about/",
 	},
 }
@@ -41,20 +61,42 @@ func ui() {
 		}, func() {
 			UINode(node)
 		})
-		clay.CLAY(clay.ID("Output"), clay.EL{
-			Layout: clay.LAY{Sizing: clay.Sizing{Width: clay.SizingFixed(600)}, Padding: PA2},
+		clay.CLAY_LATE(clay.ID("Output"), func() clay.EL {
+			return clay.EL{
+				Layout: clay.LAY{
+					LayoutDirection: clay.TopToBottom,
+					Sizing:          clay.Sizing{Width: clay.SizingFixed(600), Height: clay.SizingGrow(1, 0)},
+					Padding:         PA2,
+				},
+				Clip: clay.ClipElementConfig{
+					Vertical:    true,
+					ChildOffset: clay.GetScrollOffset(),
+				},
+			}
 		}, func() {
-			var output []byte
-			if err := node.Cmd.Err(); err != nil {
-				output = []byte(err.Error())
-			} else {
-				output = node.Cmd.CombinedOutput()
-			}
-			if len(output) == 0 {
-				output = []byte("No output yet")
-			}
+			result := node.Action.Result()
+			if result.Err == nil {
+				for i, output := range result.Outputs {
+					port := node.OutputPorts[i]
+					if port.Type.Kind != output.Type.Kind {
+						panic(fmt.Errorf("mismatched types: expected %v, got %v", port.Type.Kind, output.Type.Kind))
+					}
 
-			clay.TEXT(string(output), clay.TextElementConfig{FontID: JetBrainsMono, FontSize: F3, TextColor: White})
+					clay.TEXT(port.Name, clay.TextElementConfig{FontID: InterSemibold, FontSize: F3, TextColor: White})
+					switch output.Type.Kind {
+					case FSKindBytes:
+						if len(output.BytesValue) == 0 {
+							clay.TEXT("<no data>", clay.TextElementConfig{FontID: JetBrainsMono, FontSize: F3, TextColor: LightGray})
+						} else {
+							clay.TEXT(string(output.BytesValue), clay.TextElementConfig{FontID: JetBrainsMono, FontSize: F3, TextColor: White})
+						}
+					default:
+						clay.TEXT("Unknown data type", clay.TextElementConfig{FontSize: F3, TextColor: White})
+					}
+				}
+			} else {
+				clay.TEXT(result.Err.Error(), clay.TextElementConfig{FontSize: F3, TextColor: Red})
+			}
 		})
 	})
 
@@ -130,7 +172,7 @@ func UINode(node *Node) {
 		clay.CLAY(clay.ID("NodeBody"), clay.EL{
 			Layout: clay.LAY{Sizing: GROWH, Padding: PA2},
 		}, func() {
-			UITextBox(clay.ID("Cmd"), &node.Cmd.CmdString, clay.EL{Layout: clay.LAY{Sizing: GROWH}})
+			node.Action.UI(node)
 		})
 	})
 }

@@ -1165,6 +1165,12 @@ func SetPointerState(position Vector2, pointerDown bool) {
 	C.Clay_SetPointerState(position.C(), C.bool(pointerDown))
 }
 
+// Returns the internally stored scroll offset for the currently open element.
+// Generally intended for use with clip elements to create scrolling containers.
+func GetScrollOffset() Vector2 {
+	return Vector22Go(C.Clay_GetScrollOffset())
+}
+
 // Updates the state of Clay's internal scroll data, updating scroll content positions if scrollDelta is non zero, and progressing momentum scrolling.
 // - enableDragScrolling when set to true will enable mobile device like "touch drag" scroll of scroll containers, including momentum scrolling after the touch has ended.
 // - scrollDelta is the amount to scroll this frame on each axis in pixels.

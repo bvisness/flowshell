@@ -6,37 +6,63 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/bvisness/flowshell/clay"
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
 type V2 = rl.Vector2
 
 type Node struct {
-	ID  int
-	Pos V2
+	ID   int
+	Pos  V2
+	Name string
 
-	Cmd NodeCmd
+	InputPorts  []NodePort
+	OutputPorts []NodePort
+
+	Action NodeAction
 
 	Running bool
 }
 
-type NodeCmd struct {
+type NodePort struct {
+	Name string
+	Type FlowType
+}
+
+func (n *Node) Run() {
+	if n.Running {
+		return
+	}
+	n.Running = true
+
+	done := n.Action.Run(n)
+	go func() {
+		<-done
+		n.Running = false
+	}()
+}
+
+type NodeAction interface {
+	UI(n *Node)
+	Run(n *Node) (done <-chan struct{})
+	Result() NodeActionResult
+}
+
+type NodeActionResult struct {
+	Outputs []FlowValue
+	Err     error
+}
+
+type CmdAction struct {
 	CmdString string
 
-	state             NodeCmdRuntimeState
+	state             CmdActionRuntimeState
 	outputStreamMutex sync.Mutex
 }
 
-func (c *NodeCmd) Err() error {
-	return c.state.err
-}
-
-func (c *NodeCmd) CombinedOutput() []byte {
-	return c.state.combined
-}
-
 // The state that gets reset every time you run a command
-type NodeCmdRuntimeState struct {
+type CmdActionRuntimeState struct {
 	cmd    *exec.Cmd
 	cancel context.CancelFunc
 
@@ -48,38 +74,60 @@ type NodeCmdRuntimeState struct {
 	exitCode int
 }
 
-func (n *Node) Run() {
-	if n.Running {
-		return
-	}
-	n.Running = true
+func (c *CmdAction) UI(n *Node) {
+	UITextBox(clay.ID("Cmd"), &c.CmdString, clay.EL{Layout: clay.LAY{Sizing: GROWH}})
+}
 
-	// TODO: Handle other node types besides cmd
-	pieces := strings.Split(n.Cmd.CmdString, " ")
+func (c *CmdAction) Run(n *Node) <-chan struct{} {
+	pieces := strings.Split(c.CmdString, " ")
 	ctx, cancel := context.WithCancel(context.Background())
 	cmd := exec.CommandContext(ctx, pieces[0], pieces[1:]...)
 
-	n.Cmd.state = NodeCmdRuntimeState{
+	done := make(chan struct{})
+
+	c.state = CmdActionRuntimeState{
 		cmd:    cmd,
 		cancel: cancel,
 	}
 
 	cmd.Stdout = &multiSliceWriter{
-		mu: &n.Cmd.outputStreamMutex,
-		a:  &n.Cmd.state.stdout,
-		b:  &n.Cmd.state.combined,
+		mu: &c.outputStreamMutex,
+		a:  &c.state.stdout,
+		b:  &c.state.combined,
 	}
-	cmd.Stdout = &multiSliceWriter{
-		mu: &n.Cmd.outputStreamMutex,
-		a:  &n.Cmd.state.stderr,
-		b:  &n.Cmd.state.combined,
+	cmd.Stderr = &multiSliceWriter{
+		mu: &c.outputStreamMutex,
+		a:  &c.state.stderr,
+		b:  &c.state.combined,
 	}
 
 	go func() {
-		n.Cmd.state.err = n.Cmd.state.cmd.Run()
-		if n.Cmd.state.err != nil {
+		c.state.err = c.state.cmd.Run()
+		if c.state.err != nil {
 			// TODO: Extract exit code
 		}
-		n.Running = false
+		done <- struct{}{}
 	}()
+
+	return done
+}
+
+func (c *CmdAction) Result() NodeActionResult {
+	return NodeActionResult{
+		Err: c.state.err,
+		Outputs: []FlowValue{
+			{
+				Type:       &FlowType{Kind: FSKindBytes},
+				BytesValue: c.state.stdout,
+			},
+			{
+				Type:       &FlowType{Kind: FSKindBytes},
+				BytesValue: c.state.stderr,
+			},
+			{
+				Type:       &FlowType{Kind: FSKindBytes},
+				BytesValue: c.state.combined,
+			},
+		},
+	}
 }

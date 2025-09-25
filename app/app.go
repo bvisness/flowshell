@@ -53,7 +53,7 @@ func frame() {
 		clay.V2{float32(rl.GetMouseX()), float32(rl.GetMouseY())},
 		rl.IsMouseButtonDown(rl.MouseButtonLeft),
 	)
-	clay.UpdateScrollContainers(false, clay.Vector2(rl.GetMouseWheelMoveV()), rl.GetFrameTime())
+	clay.UpdateScrollContainers(false, clay.Vector2(rl.GetMouseWheelMoveV()).Times(4), rl.GetFrameTime())
 
 	clay.BeginLayout()
 	{
