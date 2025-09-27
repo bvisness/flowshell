@@ -3,8 +3,11 @@ package app
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -25,8 +28,17 @@ type Node struct {
 	OutputPorts []NodePort
 
 	Action NodeAction
+	Valid  bool
 
 	Running bool
+	done    chan struct{}
+
+	ResultAvailable bool
+	Result          NodeActionResult
+}
+
+func (n *Node) String() string {
+	return fmt.Sprintf("Node#%d(%s)", n.ID, n.Name)
 }
 
 type NodePort struct {
@@ -34,23 +46,89 @@ type NodePort struct {
 	Type FlowType
 }
 
-func (n *Node) Run() {
-	if n.Running {
-		return
-	}
-	n.Running = true
+type Wire struct {
+	StartNode, EndNode *Node
+	StartPort, EndPort int
+}
 
-	done := n.Action.Run(n)
+func (n *Node) Run() <-chan struct{} {
+	if n.Running {
+		return n.done
+	}
+
+	n.Running = true
+	n.ResultAvailable = false
+	n.done = make(chan struct{}, 1)
+
 	go func() {
-		<-done
+		// Wait on input ports
+		var inputRuns []<-chan struct{}
+		for _, inputNode := range NodeInputs(n) {
+			if !inputNode.ResultAvailable {
+				inputRuns = append(inputRuns, inputNode.Run())
+			}
+		}
+		for _, inputRun := range inputRuns {
+			<-inputRun
+		}
+
+		// Run action
+		res := <-n.Action.Run(n)
+		if res.Err == nil && len(res.Outputs) != len(n.OutputPorts) {
+			panic(fmt.Errorf("bad num outputs for %s: got %d, expected %d", n, len(n.OutputPorts), len(res.Outputs)))
+		}
+		n.Result = res
 		n.Running = false
+		n.ResultAvailable = true
+
+		n.done <- struct{}{}
+		n.done = nil
 	}()
+
+	return n.done
+}
+
+func (n *Node) GetInputWire(port int) (*Wire, bool) {
+	for _, wire := range wires {
+		if wire.EndNode == n && wire.EndPort == port {
+			return wire, true
+		}
+	}
+	return nil, false
+}
+
+func (n *Node) GetInputValue(port int) (FlowValue, bool) {
+	if port >= len(n.InputPorts) {
+		panic(fmt.Errorf("node %s has no port %d", n, port))
+	}
+
+	for _, wire := range wires {
+		if wire.EndNode == n && wire.EndPort == port {
+			return wire.StartNode.GetOutputValue(wire.StartPort)
+		}
+	}
+	return FlowValue{}, false
+}
+
+func (n *Node) GetOutputValue(port int) (FlowValue, bool) {
+	if port >= len(n.OutputPorts) {
+		panic(fmt.Errorf("node %s has no port %d", n, port))
+	}
+
+	if !n.ResultAvailable {
+		return FlowValue{}, false
+	}
+	if len(n.OutputPorts) != len(n.Result.Outputs) {
+		panic(fmt.Errorf("incorrect number of output values for %s: got %d, expected %d", n, len(n.Result.Outputs), len(n.OutputPorts)))
+	}
+	return n.Result.Outputs[port], true
 }
 
 type NodeAction interface {
+	Validate(n *Node)
 	UI(n *Node)
-	Run(n *Node) (done <-chan struct{})
-	Result() NodeActionResult
+	Run(n *Node) <-chan NodeActionResult
+	// TODO: Cancellation!
 }
 
 type NodeActionResult struct {
@@ -102,6 +180,8 @@ type RunProcessAction struct {
 	outputStreamMutex sync.Mutex
 }
 
+var _ NodeAction = &RunProcessAction{}
+
 // The state that gets reset every time you run a command
 type RunProcessActionRuntimeState struct {
 	cmd    *exec.Cmd
@@ -115,16 +195,20 @@ type RunProcessActionRuntimeState struct {
 	exitCode int
 }
 
+func (c *RunProcessAction) Validate(n *Node) {
+	n.Valid = true
+}
+
 func (c *RunProcessAction) UI(n *Node) {
 	UITextBox(clay.AUTO_ID, &c.CmdString, clay.EL{Layout: clay.LAY{Sizing: GROWH}})
 }
 
-func (c *RunProcessAction) Run(n *Node) <-chan struct{} {
+func (c *RunProcessAction) Run(n *Node) <-chan NodeActionResult {
 	pieces := strings.Split(c.CmdString, " ")
 	ctx, cancel := context.WithCancel(context.Background())
 	cmd := exec.CommandContext(ctx, pieces[0], pieces[1:]...)
 
-	done := make(chan struct{})
+	done := make(chan NodeActionResult)
 
 	c.state = RunProcessActionRuntimeState{
 		cmd:    cmd,
@@ -143,35 +227,34 @@ func (c *RunProcessAction) Run(n *Node) <-chan struct{} {
 	}
 
 	go func() {
-		defer func() { done <- struct{}{} }()
+		var res NodeActionResult
+		defer func() { done <- res }()
 
 		c.state.err = c.state.cmd.Run()
 		if c.state.err != nil {
 			// TODO: Extract exit code
 		}
+
+		res = NodeActionResult{
+			Err: c.state.err,
+			Outputs: []FlowValue{
+				{
+					Type:       &FlowType{Kind: FSKindBytes},
+					BytesValue: c.state.stdout,
+				},
+				{
+					Type:       &FlowType{Kind: FSKindBytes},
+					BytesValue: c.state.stderr,
+				},
+				{
+					Type:       &FlowType{Kind: FSKindBytes},
+					BytesValue: c.state.combined,
+				},
+			},
+		}
 	}()
 
 	return done
-}
-
-func (c *RunProcessAction) Result() NodeActionResult {
-	return NodeActionResult{
-		Err: c.state.err,
-		Outputs: []FlowValue{
-			{
-				Type:       &FlowType{Kind: FSKindBytes},
-				BytesValue: c.state.stdout,
-			},
-			{
-				Type:       &FlowType{Kind: FSKindBytes},
-				BytesValue: c.state.stderr,
-			},
-			{
-				Type:       &FlowType{Kind: FSKindBytes},
-				BytesValue: c.state.combined,
-			},
-		},
-	}
 }
 
 // --------------------------------
@@ -199,37 +282,39 @@ func NewListFilesNode(dir string) *Node {
 
 type ListFilesAction struct {
 	Dir string
+}
 
-	rows [][]FlowValueField
-	err  error
+var _ NodeAction = &ListFilesAction{}
+
+func (c *ListFilesAction) Validate(n *Node) {
+	n.Valid = true
 }
 
 func (c *ListFilesAction) UI(n *Node) {
 	UITextBox(clay.ID("Cmd"), &c.Dir, clay.EL{Layout: clay.LAY{Sizing: GROWH}})
 }
 
-func (c *ListFilesAction) Run(n *Node) <-chan struct{} {
-	done := make(chan struct{})
-
-	c.rows = nil
-	c.err = nil
+func (c *ListFilesAction) Run(n *Node) <-chan NodeActionResult {
+	done := make(chan NodeActionResult)
 
 	go func() {
-		defer func() { done <- struct{}{} }()
+		var res NodeActionResult
+		defer func() { done <- res }()
 
 		entries, err := os.ReadDir(c.Dir)
 		if err != nil {
-			c.err = err
+			res.Err = err
 			return
 		}
 
+		var rows [][]FlowValueField
 		for _, entry := range entries {
 			info, err := entry.Info()
 			if errors.Is(err, os.ErrNotExist) {
 				// This can happen if a file was deleted since the dir was listed. Unlikely but hey.
 				continue
 			} else if err != nil {
-				c.err = err
+				res.Err = err
 				return
 			}
 
@@ -239,31 +324,97 @@ func (c *ListFilesAction) Run(n *Node) <-chan struct{} {
 				{Name: "size", Value: Int64Value(info.Size(), FSUnitBytes)},
 				{Name: "modified", Value: TimestampValue(info.ModTime())},
 			}
-			c.rows = append(c.rows, row)
+			rows = append(rows, row)
+		}
+
+		res = NodeActionResult{
+			Outputs: []FlowValue{{
+				Type:       &FlowType{Kind: FSKindTable, ContainedType: FSFile},
+				TableValue: rows,
+			}},
 		}
 	}()
 
 	return done
 }
 
-func (c *ListFilesAction) Result() NodeActionResult {
-	return NodeActionResult{
-		Err: c.err,
-		Outputs: []FlowValue{{
-			Type:       &FlowType{Kind: FSKindTable, ContainedType: FSFile},
-			TableValue: c.rows,
+func StringValue(str string) FlowValue {
+	return FlowValue{Type: &FlowType{Kind: FSKindBytes}, BytesValue: []byte(str)}
+}
+
+func Int64Value(v int64, unit FlowUnit) FlowValue {
+	return FlowValue{Type: &FlowType{Kind: FSKindInt64, Unit: unit}, Int64Value: v}
+}
+
+func TimestampValue(t time.Time) FlowValue {
+	return FlowValue{Type: FSTimestamp, Int64Value: t.Unix()}
+}
+
+// --------------------------------
+// Lines
+
+func NewLinesNode() *Node {
+	return &Node{
+		ID:   NewNodeID(),
+		Name: "Lines",
+
+		InputPorts: []NodePort{{
+			Name: "Text",
+			Type: FlowType{Kind: FSKindBytes},
 		}},
+		OutputPorts: []NodePort{{
+			Name: "Files",
+			Type: FlowType{Kind: FSKindList, ContainedType: FSFile},
+		}},
+
+		Action: &LinesAction{
+			IncludeCarriageReturns: runtime.GOOS == "windows",
+		},
 	}
 }
 
-func StringValue(str string) *FlowValue {
-	return &FlowValue{Type: &FlowType{Kind: FSKindBytes}, BytesValue: []byte(str)}
+type LinesAction struct {
+	IncludeCarriageReturns bool
 }
 
-func Int64Value(v int64, unit FlowUnit) *FlowValue {
-	return &FlowValue{Type: &FlowType{Kind: FSKindInt64, Unit: unit}, Int64Value: v}
+var _ NodeAction = &LinesAction{}
+
+func (c *LinesAction) Validate(n *Node) {
+	n.Valid = true
+
+	if _, ok := n.GetInputWire(0); !ok {
+		n.Valid = false
+	}
 }
 
-func TimestampValue(t time.Time) *FlowValue {
-	return &FlowValue{Type: FSTimestamp, Int64Value: t.Unix()}
+func (l *LinesAction) UI(n *Node) {
+	// TODO: Checkbox for carriage returns
+}
+
+var LFSplit = regexp.MustCompile(`\n`)
+var CRLFSplit = regexp.MustCompile(`\r?\n`)
+
+func (l *LinesAction) Run(n *Node) <-chan NodeActionResult {
+	done := make(chan NodeActionResult)
+
+	go func() {
+		var res NodeActionResult
+		defer func() { done <- res }()
+
+		text, ok := n.GetInputValue(0)
+		if !ok {
+			panic(fmt.Errorf("node %s: no text input, should have been caught by validation"))
+		}
+		linesStrs := util.Tern(l.IncludeCarriageReturns, CRLFSplit, LFSplit).Split(string(text.BytesValue), -1)
+		lines := util.Map(linesStrs, func(line string) FlowValue { return StringValue(line) })
+
+		res = NodeActionResult{
+			Outputs: []FlowValue{{
+				Type:      &FlowType{Kind: FSKindList, ContainedType: &FlowType{Kind: FSKindBytes}},
+				ListValue: lines,
+			}},
+		}
+	}()
+
+	return done
 }

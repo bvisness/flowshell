@@ -13,7 +13,7 @@ type FlowValue struct {
 
 type FlowValueField struct {
 	Name  string
-	Value *FlowValue
+	Value FlowValue
 }
 
 type FlowTypeKind int

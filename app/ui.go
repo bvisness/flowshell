@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/bvisness/flowshell/clay"
@@ -17,6 +18,14 @@ const NodeMinWidth = 360
 var nodes = []*Node{
 	NewRunProcessNode("curl https://bvisness.me/about/"),
 	NewListFilesNode("."),
+	NewLinesNode(),
+}
+
+var wires = []*Wire{
+	{
+		StartNode: nodes[0], StartPort: 0,
+		EndNode: nodes[2], EndPort: 0,
+	},
 }
 
 var selectedNodeID = 0
@@ -30,11 +39,28 @@ func GetSelectedNode() (*Node, bool) {
 	return nil, false
 }
 
+func NodeInputs(n *Node) []*Node {
+	var res []*Node
+	for _, wire := range wires {
+		if wire.EndNode == n && !slices.Contains(res, wire.StartNode) {
+			res = append(res, wire.StartNode)
+		}
+	}
+	return res
+}
+
 var UICursor rl.MouseCursor
 
 func ui() {
 	nodes[0].Pos = V2{10, 10}
 	nodes[1].Pos = V2{400, 10}
+	nodes[2].Pos = V2{400, 200}
+
+	// Sweep the graph, validating all nodes
+	// TODO: TOPOSORT
+	for _, node := range nodes {
+		node.Action.Validate(node)
+	}
 
 	clay.CLAY(clay.ID("Background"), clay.EL{
 		Layout:          clay.LAY{Sizing: GROWALL},
@@ -63,19 +89,21 @@ func ui() {
 			}
 		}, func() {
 			if selectedNode, ok := GetSelectedNode(); ok {
-				result := selectedNode.Action.Result()
-				if result.Err == nil {
-					for outputIndex, output := range result.Outputs {
-						port := selectedNode.OutputPorts[outputIndex]
-						if port.Type.Kind != output.Type.Kind {
-							panic(fmt.Errorf("mismatched types: expected %v, got %v", port.Type.Kind, output.Type.Kind))
-						}
+				if selectedNode.ResultAvailable {
+					result := selectedNode.Result
+					if result.Err == nil {
+						for outputIndex, output := range result.Outputs {
+							port := selectedNode.OutputPorts[outputIndex]
+							if port.Type.Kind != output.Type.Kind {
+								panic(fmt.Errorf("mismatched types: expected %v, got %v", port.Type.Kind, output.Type.Kind))
+							}
 
-						clay.TEXT(port.Name, clay.TextElementConfig{FontID: InterSemibold, TextColor: White})
-						UIFlowValue(&output)
+							clay.TEXT(port.Name, clay.TextElementConfig{FontID: InterSemibold, TextColor: White})
+							UIFlowValue(output)
+						}
+					} else {
+						clay.TEXT(result.Err.Error(), clay.TextElementConfig{TextColor: Red})
 					}
-				} else {
-					clay.TEXT(result.Err.Error(), clay.TextElementConfig{TextColor: Red})
 				}
 			}
 		})
@@ -83,21 +111,6 @@ func ui() {
 
 	rl.SetMouseCursor(UICursor)
 	UICursor = rl.MouseCursorDefault
-}
-
-func menu() {
-	clay.CLAY(clay.ID("RightClickMenu"), clay.EL{
-		Layout: clay.LAY{
-			LayoutDirection: clay.TopToBottom,
-			Sizing:          clay.Sizing{Width: clay.SizingFit(MenuMinWidth, MenuMaxWidth)},
-		},
-		Floating:        clay.FloatingElementConfig{AttachTo: clay.AttachToRoot, Offset: clay.V2{float32(rl.GetMouseX()), float32(rl.GetMouseY())}},
-		BackgroundColor: DarkGray,
-	}, func() {
-		clay.CLAY(clay.ID("thing"), clay.EL{Layout: clay.LayoutConfig{Padding: PVH(S2, S3)}}, func() {
-			clay.TEXT("Hi! I'm text!", clay.TextElementConfig{TextColor: White})
-		})
-	})
 }
 
 func UINode(node *Node) {
@@ -144,17 +157,21 @@ func UINode(node *Node) {
 			if node.Running {
 				clay.TEXT("Running...", clay.TextElementConfig{TextColor: White})
 			}
+
+			playButtonDisabled := !node.Valid || node.Running
 			UIButton(clay.AUTO_ID, // Play button
 				UIButtonConfig{
-					El: clay.EL{Layout: clay.LAY{Padding: PA1}},
+					El:       clay.EL{Layout: clay.LAY{Padding: PA1}},
+					Disabled: playButtonDisabled,
 					OnClick: func(elementID clay.ElementID, pointerData clay.PointerData, userData any) {
 						node.Run()
 					},
 				},
 				func() {
 					clay.CLAY_AUTO_ID(clay.EL{
-						Layout: clay.LAY{Sizing: clay.Sizing{Width: clay.SizingFixed(float32(ImgPlay.Width)), Height: clay.SizingFixed(float32(ImgPlay.Height))}},
-						Image:  clay.ImageElementConfig{ImageData: ImgPlay},
+						Layout:          clay.LAY{Sizing: clay.Sizing{Width: clay.SizingFixed(float32(ImgPlay.Width)), Height: clay.SizingFixed(float32(ImgPlay.Height))}},
+						Image:           clay.ImageElementConfig{ImageData: ImgPlay},
+						BackgroundColor: util.Tern(playButtonDisabled, LightGray, PlayButtonGreen),
 					})
 
 					if clay.Hovered() {
@@ -171,7 +188,7 @@ func UINode(node *Node) {
 	})
 }
 
-func UIFlowValue(v *FlowValue) {
+func UIFlowValue(v FlowValue) {
 	switch v.Type.Kind {
 	case FSKindBytes:
 		if len(v.BytesValue) == 0 {
@@ -189,12 +206,25 @@ func UIFlowValue(v *FlowValue) {
 			str = fmt.Sprintf("%d", v.Int64Value)
 		}
 		clay.TEXT(str, clay.TextElementConfig{TextColor: White})
+	case FSKindList:
+		clay.CLAY_AUTO_ID(clay.EL{ // list items
+			Layout: clay.LAY{LayoutDirection: clay.TopToBottom, ChildGap: S2},
+		}, func() {
+			for i, item := range v.ListValue {
+				clay.CLAY_AUTO_ID(clay.EL{ // list item
+					Layout: clay.LAY{ChildGap: S2},
+				}, func() {
+					clay.TEXT(fmt.Sprintf("%d", i), clay.TextElementConfig{FontID: InterSemibold, TextColor: White})
+					UIFlowValue(item)
+				})
+			}
+		})
 	case FSKindTable:
-		clay.CLAY(clay.ID("Table"), clay.EL{
+		clay.CLAY_AUTO_ID(clay.EL{ // Table
 			Layout: clay.LAY{LayoutDirection: clay.TopToBottom},
 			Border: clay.BorderElementConfig{Width: clay.BorderWidth{Left: 1, Right: 1, Top: 1, Bottom: 1, BetweenChildren: 1}, Color: Gray},
 		}, func() {
-			clay.CLAY(clay.ID("TableHeader"), clay.EL{
+			clay.CLAY_AUTO_ID(clay.EL{ // Table header
 				Border: clay.BorderElementConfig{Width: BTW, Color: Gray},
 			}, func() {
 				for _, field := range v.Type.ContainedType.Fields {
@@ -205,8 +235,8 @@ func UIFlowValue(v *FlowValue) {
 					})
 				}
 			})
-			for i, row := range v.TableValue {
-				clay.CLAY(clay.IDI("TableRow", i), clay.EL{
+			for _, row := range v.TableValue {
+				clay.CLAY_AUTO_ID(clay.EL{ // Table row
 					Border: clay.BorderElementConfig{Width: BTW, Color: Gray},
 				}, func() {
 					for _, field := range row {
@@ -225,7 +255,8 @@ func UIFlowValue(v *FlowValue) {
 }
 
 type UIButtonConfig struct {
-	El clay.ElementDeclaration
+	El       clay.ElementDeclaration
+	Disabled bool
 
 	OnHover         clay.OnHoverFunc
 	OnHoverUserData any
@@ -237,19 +268,21 @@ type UIButtonConfig struct {
 func UIButton(id clay.ElementID, config UIButtonConfig, children ...func()) {
 	clay.CLAY_LATE(id, func() clay.ElementDeclaration {
 		config.El.CornerRadius = RA1
-		config.El.BackgroundColor = util.Tern(clay.Hovered(), clay.Color{255, 255, 255, 20}, clay.Color{})
+		config.El.BackgroundColor = util.Tern(clay.Hovered() && !config.Disabled, clay.Color{255, 255, 255, 20}, clay.Color{})
 
 		return config.El
 	}, func() {
 		clay.OnHover(func(elementID clay.ElementID, pointerData clay.PointerData, _ any) {
-			UICursor = rl.MouseCursorPointingHand
+			if !config.Disabled {
+				UICursor = rl.MouseCursorPointingHand
+			}
 
 			if config.OnHover != nil {
 				config.OnHover(elementID, pointerData, config.OnHoverUserData)
 			}
 
 			// TODO: Check global UI state to see what UI component the click started on
-			if pointerData.State == clay.PointerDataReleasedThisFrame {
+			if !config.Disabled && pointerData.State == clay.PointerDataReleasedThisFrame {
 				if config.OnClick != nil {
 					config.OnClick(elementID, pointerData, config.OnClickUserData)
 				}
@@ -308,6 +341,21 @@ func FormatBytes(n int64) string {
 	} else {
 		return fmt.Sprintf("%.1f TB", float32(n)/1_000_000_000_000)
 	}
+}
+
+func menu() {
+	clay.CLAY(clay.ID("RightClickMenu"), clay.EL{
+		Layout: clay.LAY{
+			LayoutDirection: clay.TopToBottom,
+			Sizing:          clay.Sizing{Width: clay.SizingFit(MenuMinWidth, MenuMaxWidth)},
+		},
+		Floating:        clay.FloatingElementConfig{AttachTo: clay.AttachToRoot, Offset: clay.V2{float32(rl.GetMouseX()), float32(rl.GetMouseY())}},
+		BackgroundColor: DarkGray,
+	}, func() {
+		clay.CLAY(clay.ID("thing"), clay.EL{Layout: clay.LayoutConfig{Padding: PVH(S2, S3)}}, func() {
+			clay.TEXT("Hi! I'm text!", clay.TextElementConfig{TextColor: White})
+		})
+	})
 }
 
 func clayExample() {

@@ -11,6 +11,8 @@ var White = clay.Color{250, 250, 252, 255}
 var Red = clay.Color{214, 25, 50, 255}
 var Blue = clay.Color{11, 88, 183, 255}
 
+var PlayButtonGreen = clay.Color{61, 159, 72, 255}
+
 const S1 = 4
 const S2 = 8
 const S3 = 16
