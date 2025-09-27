@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"runtime"
 	"strings"
@@ -193,6 +194,18 @@ func NewNodeID() int {
 // TODO: Make this node polymorphic on lists of strings
 // (rename to "Load Files" dynamically)
 func NewLoadFileNode(path string) *Node {
+	formatDropdown := UIDropdown{
+		Options: []UIDropdownOption{
+			{Name: "Raw bytes", Value: "raw"},
+			{Name: "CSV", Value: "csv"},
+			{Name: "JSON", Value: "json"},
+		},
+	}
+
+	if ext := strings.ToLower(filepath.Ext(path)); ext != "" {
+		formatDropdown.SelectByValue(ext[1:])
+	}
+
 	return &Node{
 		ID:   NewNodeID(),
 		Name: "Load File",
@@ -207,14 +220,8 @@ func NewLoadFileNode(path string) *Node {
 		}},
 
 		Action: &LoadFileAction{
-			path: path,
-			format: UIDropdown{
-				Options: []UIDropdownOption{
-					{Name: "Raw bytes", Value: "raw"},
-					{Name: "CSV", Value: "csv"},
-					{Name: "JSON", Value: "json"},
-				},
-			},
+			path:   path,
+			format: formatDropdown,
 		},
 	}
 }

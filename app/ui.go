@@ -390,6 +390,15 @@ func (d *UIDropdown) GetSelectedOption() UIDropdownOption {
 	return d.GetOption(d.Selected)
 }
 
+func (d *UIDropdown) SelectByValue(v any) {
+	for i, opt := range d.Options {
+		if opt.Value == v {
+			d.Selected = i
+			break
+		}
+	}
+}
+
 type UIDropdownConfig struct {
 	El       clay.EL
 	OnChange OnChangeFunc
