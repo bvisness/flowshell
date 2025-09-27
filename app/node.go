@@ -363,7 +363,7 @@ func NewLinesNode() *Node {
 			Type: FlowType{Kind: FSKindBytes},
 		}},
 		OutputPorts: []NodePort{{
-			Name: "Files",
+			Name: "Lines",
 			Type: FlowType{Kind: FSKindList, ContainedType: FSFile},
 		}},
 

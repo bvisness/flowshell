@@ -208,7 +208,7 @@ func UIFlowValue(v FlowValue) {
 		clay.TEXT(str, clay.TextElementConfig{TextColor: White})
 	case FSKindList:
 		clay.CLAY_AUTO_ID(clay.EL{ // list items
-			Layout: clay.LAY{LayoutDirection: clay.TopToBottom, ChildGap: S2},
+			Layout: clay.LAY{LayoutDirection: clay.TopToBottom, ChildGap: S1},
 		}, func() {
 			for i, item := range v.ListValue {
 				clay.CLAY_AUTO_ID(clay.EL{ // list item
