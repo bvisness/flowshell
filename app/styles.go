@@ -12,10 +12,22 @@ var Red = clay.Color{214, 25, 50, 255}
 var Blue = clay.Color{11, 88, 183, 255}
 
 var PlayButtonGreen = clay.Color{61, 159, 72, 255}
+var HoverWhite = clay.Color{255, 255, 255, 20}
 
 const S1 = 4
 const S2 = 8
 const S3 = 16
+
+var W1 = clay.Sizing{Width: clay.SizingFixed(S1)}
+var W2 = clay.Sizing{Width: clay.SizingFixed(S2)}
+var W3 = clay.Sizing{Width: clay.SizingFixed(S3)}
+
+func WH(w, h float32) clay.Sizing {
+	return clay.Sizing{
+		Width:  clay.SizingFixed(w),
+		Height: clay.SizingFixed(h),
+	}
+}
 
 var PA1 = clay.PaddingAll(S1)
 var PA2 = clay.PaddingAll(S2)
@@ -42,6 +54,15 @@ func PD(t, r, b, l uint16, padding clay.Padding) clay.Padding {
 var BA = clay.BorderWidth{Left: 1, Right: 1, Top: 1, Bottom: 1}
 var BA2 = clay.BorderWidth{Left: 2, Right: 2, Top: 2, Bottom: 2}
 var BTW = clay.BorderWidth{BetweenChildren: 1}
+
+func BW(t, r, b, l uint16) clay.BorderWidth {
+	return clay.BorderWidth{
+		Left:   l,
+		Right:  r,
+		Top:    t,
+		Bottom: b,
+	}
+}
 
 const F1 = 12
 const F2 = 16
@@ -71,3 +92,6 @@ var GROWALL = clay.Sizing{Width: clay.SizingGrow(1, 0), Height: clay.SizingGrow(
 var XRIGHT = clay.ChildAlignment{X: clay.AlignXRight}
 var XCENTER = clay.ChildAlignment{X: clay.AlignXCenter}
 var YCENTER = clay.ChildAlignment{Y: clay.AlignYCenter}
+var ALLCENTER = clay.ChildAlignment{X: clay.AlignXCenter, Y: clay.AlignYCenter}
+
+const ZTOP = 1000

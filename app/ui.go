@@ -19,6 +19,7 @@ var nodes = []*Node{
 	NewRunProcessNode("curl https://bvisness.me/about/"),
 	NewListFilesNode("."),
 	NewLinesNode(),
+	NewLoadFileNode("go.mod"),
 }
 
 var wires = []*Wire{
@@ -51,15 +52,26 @@ func NodeInputs(n *Node) []*Node {
 
 var UICursor rl.MouseCursor
 
+func beforeLayout() {
+	if rl.IsFileDropped() {
+		for i, filename := range rl.LoadDroppedFiles() {
+			n := NewLoadFileNode(filename)
+			n.Pos = V2(clay.V2(rl.GetMousePosition()).Plus(clay.V2{20, 20}.Times(float32(i))))
+			nodes = append(nodes, n)
+		}
+	}
+}
+
 func ui() {
 	nodes[0].Pos = V2{10, 10}
 	nodes[1].Pos = V2{400, 10}
 	nodes[2].Pos = V2{400, 200}
+	nodes[3].Pos = V2{10, 200}
 
 	// Sweep the graph, validating all nodes
 	// TODO: TOPOSORT
 	for _, node := range nodes {
-		node.Action.Validate(node)
+		node.Action.UpdateAndValidate(node)
 	}
 
 	clay.CLAY(clay.ID("Background"), clay.EL{
@@ -94,8 +106,8 @@ func ui() {
 					if result.Err == nil {
 						for outputIndex, output := range result.Outputs {
 							port := selectedNode.OutputPorts[outputIndex]
-							if port.Type.Kind != output.Type.Kind {
-								panic(fmt.Errorf("mismatched types: expected %v, got %v", port.Type.Kind, output.Type.Kind))
+							if err := Typecheck(*output.Type, port.Type); err != nil {
+								panic(err)
 							}
 
 							clay.TEXT(port.Name, clay.TextElementConfig{FontID: InterSemibold, TextColor: White})
@@ -177,7 +189,7 @@ func UINode(node *Node) {
 			}, nil)
 
 			clay.TEXT(node.Name, clay.TextElementConfig{FontID: InterSemibold, FontSize: F3, TextColor: White})
-			UISpacerH()
+			UISpacer(GROWH)
 			if node.Running {
 				clay.TEXT("Running...", clay.TextElementConfig{TextColor: White})
 			}
@@ -192,9 +204,7 @@ func UINode(node *Node) {
 					},
 				},
 				func() {
-					clay.CLAY_AUTO_ID(clay.EL{
-						Layout:          clay.LAY{Sizing: clay.Sizing{Width: clay.SizingFixed(float32(ImgPlay.Width)), Height: clay.SizingFixed(float32(ImgPlay.Height))}},
-						Image:           clay.ImageElementConfig{ImageData: ImgPlay},
+					UIImage(clay.AUTO_ID, ImgPlay, clay.EL{
 						BackgroundColor: util.Tern(playButtonDisabled, LightGray, PlayButtonGreen),
 					})
 
@@ -310,7 +320,7 @@ type UIButtonConfig struct {
 func UIButton(id clay.ElementID, config UIButtonConfig, children ...func()) {
 	clay.CLAY_LATE(id, func() clay.ElementDeclaration {
 		config.El.CornerRadius = RA1
-		config.El.BackgroundColor = util.Tern(clay.Hovered() && !config.Disabled, clay.Color{255, 255, 255, 20}, clay.Color{})
+		config.El.BackgroundColor = util.Tern(clay.Hovered() && !config.Disabled, HoverWhite, clay.Color{})
 
 		return config.El
 	}, func() {
@@ -352,8 +362,131 @@ func UITextBox(id clay.ElementID, str *string, decl clay.ElementDeclaration) {
 	})
 }
 
-func UISpacerH() {
-	clay.CLAY_AUTO_ID(clay.EL{Layout: clay.LAY{Sizing: GROWH}})
+type OnChangeFunc func(before, after any)
+
+type UIDropdown struct {
+	Options  []UIDropdownOption
+	Selected int
+
+	open bool
+}
+
+type UIDropdownOption struct {
+	Name  string
+	Value any
+}
+
+func (d *UIDropdown) GetOption(i int) UIDropdownOption {
+	if len(d.Options) == 0 {
+		return UIDropdownOption{}
+	}
+	if i >= len(d.Options) {
+		return d.Options[0]
+	}
+	return d.Options[i]
+}
+
+func (d *UIDropdown) GetSelectedOption() UIDropdownOption {
+	return d.GetOption(d.Selected)
+}
+
+type UIDropdownConfig struct {
+	El       clay.EL
+	OnChange OnChangeFunc
+}
+
+func (d *UIDropdown) Do(id clay.ElementID, config UIDropdownConfig) {
+	config.El.Layout.Padding = clay.Padding{}
+	config.El.Layout.ChildAlignment.Y = clay.AlignYCenter
+	config.El.Border = clay.BorderElementConfig{Width: BA, Color: Gray}
+	config.El.BackgroundColor = DarkGray
+
+	clay.CLAY(id, config.El, func() {
+		clay.CLAY_AUTO_ID(clay.EL{
+			Layout: clay.LAY{
+				Padding: PVH(S1, S2),
+				Sizing:  GROWH,
+			},
+		}, func() {
+			clay.TEXT(d.GetSelectedOption().Name, clay.TextElementConfig{TextColor: White})
+		})
+		UIButton(clay.AUTO_ID, UIButtonConfig{
+			El: clay.EL{
+				Layout: clay.LAY{
+					ChildAlignment: ALLCENTER,
+					Sizing:         GROWV,
+					Padding:        PA2,
+				},
+				Border: clay.B{Width: clay.BW{Left: 1}, Color: Gray},
+			},
+			OnClick: func(elementID clay.ElementID, pointerData clay.PointerData, userData any) {
+				d.open = !d.open
+			},
+		}, func() {
+			UIImage(clay.AUTO_ID, util.Tern(d.open, ImgDropdownUp, ImgDropdownDown), clay.EL{
+				BackgroundColor: LightGray,
+			})
+		})
+
+		if d.open {
+			clay.CLAY_AUTO_ID(clay.EL{
+				Layout: clay.LAY{
+					LayoutDirection: clay.TopToBottom,
+					Sizing:          GROWH,
+				},
+				Floating: clay.FLOAT{
+					AttachTo:     clay.AttachToParent,
+					AttachPoints: clay.FloatingAttachPoints{Parent: clay.AttachPointLeftBottom},
+					ZIndex:       ZTOP,
+				},
+				Border: clay.B{
+					Width: clay.BW{
+						Top:  0,
+						Left: 1, Right: 1,
+						Bottom: 1,
+
+						BetweenChildren: 1,
+					},
+					Color: Gray,
+				},
+				BackgroundColor: DarkGray,
+			}, func() {
+				for i, opt := range d.Options {
+					clay.CLAY_AUTO_ID_LATE(func() clay.EL {
+						return clay.EL{
+							Layout: clay.LAY{
+								Padding: PVH(S1, S2),
+								Sizing:  GROWH,
+							},
+							BackgroundColor: util.Tern(clay.Hovered(), HoverWhite, clay.Color{}),
+						}
+					}, func() {
+						clay.OnHover(func(elementID clay.ElementID, pointerData clay.PointerData, userData any) {
+							if pointerData.State == clay.PointerDataReleasedThisFrame {
+								selectedBefore := d.Selected
+								d.Selected = userData.(int)
+								d.open = false
+								if config.OnChange != nil {
+									config.OnChange(d.GetOption(selectedBefore).Value, d.GetOption(d.Selected).Value)
+								}
+							}
+						}, i)
+						clay.TEXT(opt.Name, clay.T{TextColor: White})
+					})
+				}
+			})
+		}
+	})
+}
+
+func UISpacer(sizing clay.Sizing) {
+	clay.CLAY_AUTO_ID(clay.EL{Layout: clay.LAY{Sizing: sizing}})
+}
+
+func UIImage(id clay.ElementID, img rl.Texture2D, decl clay.EL) {
+	decl.Layout.Sizing = WH(float32(img.Width), float32(img.Height))
+	decl.Image = clay.ImageElementConfig{ImageData: img}
+	clay.CLAY(id, decl)
 }
 
 func UITooltip(msg string) {
@@ -361,7 +494,7 @@ func UITooltip(msg string) {
 		Floating: clay.FloatingElementConfig{
 			AttachTo: clay.AttachToRoot,
 			Offset:   clay.V2(rl.GetMousePosition()).Plus(clay.V2{0, 28}),
-			ZIndex:   1000,
+			ZIndex:   ZTOP,
 		},
 		Layout:          clay.LAY{Padding: PA1},
 		BackgroundColor: DarkGray,

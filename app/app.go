@@ -24,7 +24,7 @@ func Main() {
 
 	loadImages()
 
-	arena := clay.CreateArenaWithCapacity(clay.MinMemorySize())
+	arena := clay.CreateArenaWithCapacity(uintptr(clay.MinMemorySize()))
 	clay.Initialize(
 		arena,
 		clay.Dimensions{windowWidth, windowHeight},
@@ -48,6 +48,8 @@ func Main() {
 }
 
 func frame() {
+	beforeLayout()
+
 	clay.SetLayoutDimensions(clay.D{windowWidth, windowHeight})
 	clay.SetPointerState(
 		clay.V2{float32(rl.GetMouseX()), float32(rl.GetMouseY())},

@@ -1,7 +1,9 @@
 package app
 
 import (
+	"bytes"
 	"context"
+	"encoding/csv"
 	"errors"
 	"fmt"
 	"os"
@@ -83,6 +85,11 @@ func (n *Node) Run() <-chan struct{} {
 		if res.Err == nil && len(res.Outputs) != len(n.OutputPorts) {
 			panic(fmt.Errorf("bad num outputs for %s: got %d, expected %d", n, len(n.OutputPorts), len(res.Outputs)))
 		}
+		for i, output := range res.Outputs {
+			if err := Typecheck(*output.Type, n.OutputPorts[i].Type); err != nil {
+				panic(fmt.Errorf("bad value type for %s output port %d: %v", n, i, err))
+			}
+		}
 		n.Result = res
 		n.Running = false
 		n.ResultAvailable = true
@@ -94,6 +101,11 @@ func (n *Node) Run() <-chan struct{} {
 	return n.done
 }
 
+func (n *Node) ClearResult() {
+	n.ResultAvailable = false
+	n.Result = NodeActionResult{}
+}
+
 func (n *Node) GetInputWire(port int) (*Wire, bool) {
 	for _, wire := range wires {
 		if wire.EndNode == n && wire.EndPort == port {
@@ -103,17 +115,24 @@ func (n *Node) GetInputWire(port int) (*Wire, bool) {
 	return nil, false
 }
 
-func (n *Node) GetInputValue(port int) (FlowValue, bool) {
+func (n *Node) GetInputValue(port int) (FlowValue, bool, error) {
 	if port >= len(n.InputPorts) {
 		panic(fmt.Errorf("node %s has no port %d", n, port))
 	}
 
 	for _, wire := range wires {
 		if wire.EndNode == n && wire.EndPort == port {
-			return wire.StartNode.GetOutputValue(wire.StartPort)
+			wireValue, ok := wire.StartNode.GetOutputValue(wire.StartPort)
+			if !ok {
+				return FlowValue{}, false, nil
+			}
+			if err := Typecheck(*wireValue.Type, n.InputPorts[port].Type); err != nil {
+				return wireValue, true, fmt.Errorf("on input port %d: %v", port, err)
+			}
+			return wireValue, true, nil
 		}
 	}
-	return FlowValue{}, false
+	return FlowValue{}, false, nil
 }
 
 func (n *Node) GetOutputValue(port int) (FlowValue, bool) {
@@ -150,7 +169,7 @@ func (n *Node) UpdatePortPositions() {
 }
 
 type NodeAction interface {
-	Validate(n *Node)
+	UpdateAndValidate(n *Node)
 	UI(n *Node)
 	Run(n *Node) <-chan NodeActionResult
 	// TODO: Cancellation!
@@ -166,6 +185,172 @@ var nodeID = 0
 func NewNodeID() int {
 	nodeID++
 	return nodeID
+}
+
+// --------------------------------
+// Load File
+
+// TODO: Make this node polymorphic on lists of strings
+// (rename to "Load Files" dynamically)
+func NewLoadFileNode(path string) *Node {
+	return &Node{
+		ID:   NewNodeID(),
+		Name: "Load File",
+
+		InputPorts: []NodePort{{
+			Name: "Path",
+			Type: FlowType{Kind: FSKindBytes},
+		}},
+		OutputPorts: []NodePort{{
+			Name: "Data",
+			Type: FlowType{Kind: FSKindBytes},
+		}},
+
+		Action: &LoadFileAction{
+			path: path,
+			format: UIDropdown{
+				Options: []UIDropdownOption{
+					{Name: "Raw bytes", Value: "raw"},
+					{Name: "CSV", Value: "csv"},
+					{Name: "JSON", Value: "json"},
+				},
+			},
+		},
+	}
+}
+
+type LoadFileAction struct {
+	path string
+
+	format UIDropdown
+}
+
+var _ NodeAction = &LoadFileAction{}
+
+func (c *LoadFileAction) UpdateAndValidate(n *Node) {
+	switch c.format.GetSelectedOption().Value {
+	case "raw":
+		n.OutputPorts[0].Type = FlowType{Kind: FSKindBytes}
+	case "csv":
+		n.OutputPorts[0].Type = FlowType{Kind: FSKindTable, ContainedType: &FlowType{Kind: FSKindAny}}
+	case "json":
+		n.OutputPorts[0].Type = FlowType{Kind: FSKindAny}
+	}
+
+	n.Valid = true
+}
+
+func (c *LoadFileAction) UI(n *Node) {
+	clay.CLAY_AUTO_ID(clay.EL{
+		Layout: clay.LAY{
+			LayoutDirection: clay.TopToBottom,
+			Sizing:          GROWH,
+			ChildGap:        S2,
+		},
+	}, func() {
+		clay.CLAY_AUTO_ID(clay.EL{
+			Layout: clay.LAY{
+				Sizing:         GROWH,
+				ChildAlignment: YCENTER,
+			},
+		}, func() {
+			PortAnchor(n, false, 0)
+			UITextBox(clay.AUTO_ID, &c.path, clay.EL{
+				Layout: clay.LAY{Sizing: GROWH},
+			})
+			UISpacer(W2)
+			UIOutputPort(n, 0)
+		})
+
+		c.format.Do(clay.AUTO_ID, UIDropdownConfig{
+			El: clay.EL{
+				Layout: clay.LAY{Sizing: GROWH},
+			},
+			OnChange: func(before, after any) {
+				n.ClearResult()
+			},
+		})
+	})
+}
+
+func (c *LoadFileAction) Run(n *Node) <-chan NodeActionResult {
+	done := make(chan NodeActionResult)
+
+	go func() {
+		var res NodeActionResult
+		defer func() { done <- res }()
+
+		content, err := os.ReadFile(c.path) // TODO: Get path from port
+		if err != nil {
+			res.Err = err
+			return
+		}
+
+		switch format := c.format.GetSelectedOption().Value; format {
+		case "raw":
+			res = NodeActionResult{
+				Outputs: []FlowValue{NewBytesValue(content)},
+			}
+		case "csv":
+			r := csv.NewReader(bytes.NewReader(content))
+			rows, err := r.ReadAll()
+			if err != nil {
+				res.Err = err
+				return
+			}
+
+			// Special case: if we don't even get a row, synthesize an empty table with no columns.
+			if len(rows) == 0 {
+				res = NodeActionResult{
+					Outputs: []FlowValue{{
+						Type: &FlowType{
+							Kind: FSKindTable,
+							ContainedType: &FlowType{
+								Kind:   FSKindRecord,
+								Fields: nil,
+							},
+						},
+					}},
+				}
+				return
+			}
+
+			tableRecordType := FlowType{Kind: FSKindRecord}
+			for _, headerField := range rows[0] {
+				tableRecordType.Fields = append(tableRecordType.Fields, FlowField{
+					Name: headerField,
+					Type: &FlowType{Kind: FSKindBytes},
+				})
+			}
+
+			// TODO(low): Be resilient against variable numbers of fields per row, potentially
+			var tableRows [][]FlowValueField
+			for _, row := range rows[1:] {
+				var flowRow []FlowValueField
+				for col, value := range row {
+					flowRow = append(flowRow, FlowValueField{
+						Name:  rows[0][col],
+						Value: NewStringValue(value),
+					})
+				}
+				tableRows = append(tableRows, flowRow)
+			}
+
+			res = NodeActionResult{
+				Outputs: []FlowValue{{
+					Type: &FlowType{
+						Kind:          FSKindTable,
+						ContainedType: &tableRecordType,
+					},
+					TableValue: tableRows,
+				}},
+			}
+		default:
+			res.Err = fmt.Errorf("unknown format \"%v\"", format)
+		}
+	}()
+
+	return done
 }
 
 // --------------------------------
@@ -220,7 +405,7 @@ type RunProcessActionRuntimeState struct {
 	exitCode int
 }
 
-func (c *RunProcessAction) Validate(n *Node) {
+func (c *RunProcessAction) UpdateAndValidate(n *Node) {
 	n.Valid = true
 }
 
@@ -331,7 +516,7 @@ type ListFilesAction struct {
 
 var _ NodeAction = &ListFilesAction{}
 
-func (c *ListFilesAction) Validate(n *Node) {
+func (c *ListFilesAction) UpdateAndValidate(n *Node) {
 	n.Valid = true
 }
 
@@ -364,10 +549,10 @@ func (c *ListFilesAction) Run(n *Node) <-chan NodeActionResult {
 			}
 
 			row := []FlowValueField{
-				{Name: "name", Value: StringValue(entry.Name())},
-				{Name: "type", Value: StringValue(util.Tern(entry.IsDir(), "dir", "file"))},
-				{Name: "size", Value: Int64Value(info.Size(), FSUnitBytes)},
-				{Name: "modified", Value: TimestampValue(info.ModTime())},
+				{Name: "name", Value: NewStringValue(entry.Name())},
+				{Name: "type", Value: NewStringValue(util.Tern(entry.IsDir(), "dir", "file"))},
+				{Name: "size", Value: NewInt64Value(info.Size(), FSUnitBytes)},
+				{Name: "modified", Value: NewTimestampValue(info.ModTime())},
 			}
 			rows = append(rows, row)
 		}
@@ -383,15 +568,19 @@ func (c *ListFilesAction) Run(n *Node) <-chan NodeActionResult {
 	return done
 }
 
-func StringValue(str string) FlowValue {
+func NewBytesValue(bytes []byte) FlowValue {
+	return FlowValue{Type: &FlowType{Kind: FSKindBytes}, BytesValue: bytes}
+}
+
+func NewStringValue(str string) FlowValue {
 	return FlowValue{Type: &FlowType{Kind: FSKindBytes}, BytesValue: []byte(str)}
 }
 
-func Int64Value(v int64, unit FlowUnit) FlowValue {
+func NewInt64Value(v int64, unit FlowUnit) FlowValue {
 	return FlowValue{Type: &FlowType{Kind: FSKindInt64, Unit: unit}, Int64Value: v}
 }
 
-func TimestampValue(t time.Time) FlowValue {
+func NewTimestampValue(t time.Time) FlowValue {
 	return FlowValue{Type: FSTimestamp, Int64Value: t.Unix()}
 }
 
@@ -409,7 +598,7 @@ func NewLinesNode() *Node {
 		}},
 		OutputPorts: []NodePort{{
 			Name: "Lines",
-			Type: FlowType{Kind: FSKindList, ContainedType: FSFile},
+			Type: FlowType{Kind: FSKindList, ContainedType: &FlowType{Kind: FSKindBytes}},
 		}},
 
 		Action: &LinesAction{
@@ -424,7 +613,7 @@ type LinesAction struct {
 
 var _ NodeAction = &LinesAction{}
 
-func (c *LinesAction) Validate(n *Node) {
+func (c *LinesAction) UpdateAndValidate(n *Node) {
 	n.Valid = true
 
 	if _, ok := n.GetInputWire(0); !ok {
@@ -469,12 +658,16 @@ func (l *LinesAction) Run(n *Node) <-chan NodeActionResult {
 		var res NodeActionResult
 		defer func() { done <- res }()
 
-		text, ok := n.GetInputValue(0)
+		text, ok, err := n.GetInputValue(0)
 		if !ok {
 			panic(fmt.Errorf("node %s: no text input, should have been caught by validation", n))
 		}
+		if err != nil {
+			res.Err = err
+			return
+		}
 		linesStrs := util.Tern(l.IncludeCarriageReturns, CRLFSplit, LFSplit).Split(string(text.BytesValue), -1)
-		lines := util.Map(linesStrs, func(line string) FlowValue { return StringValue(line) })
+		lines := util.Map(linesStrs, func(line string) FlowValue { return NewStringValue(line) })
 
 		res = NodeActionResult{
 			Outputs: []FlowValue{{

@@ -472,6 +472,7 @@ type TextElementConfig struct {
 	// wrapped lines of text to the right hand side of their bounding box.
 	TextAlignment TextAlignment
 }
+type T = TextElementConfig
 
 func (r TextElementConfig) C() C.Clay_TextElementConfig {
 	return C.Clay_TextElementConfig{
@@ -506,6 +507,7 @@ type AspectRatioElementConfig struct {
 	// height.
 	AspectRatio float32
 }
+type ASPECT = AspectRatioElementConfig
 
 func (r AspectRatioElementConfig) C() C.Clay_AspectRatioElementConfig {
 	return C.Clay_AspectRatioElementConfig{
@@ -526,7 +528,7 @@ func (r ImageElementConfig) C() C.Clay_ImageElementConfig {
 		imageHandle := cgo.NewHandle(r.ImageData)
 		imageHandlePtr = unsafe.Pointer(&imageHandle)
 	}
-	// pinner.Pin(&imageData)
+	// pinner.Pin(imageHandlePtr)
 
 	return C.Clay_ImageElementConfig{
 		imageData: imageHandlePtr,
@@ -670,6 +672,7 @@ type FloatingElementConfig struct {
 	// clipping rectangle as the element it's attached to.
 	ClipTo FloatingClipToElement
 }
+type FLOAT = FloatingElementConfig
 
 func (r FloatingElementConfig) C() C.Clay_FloatingElementConfig {
 	return C.Clay_FloatingElementConfig{
@@ -727,6 +730,7 @@ type BorderWidth struct {
 	// generated.
 	BetweenChildren uint16
 }
+type BW = BorderWidth
 
 func (r BorderWidth) C() C.Clay_BorderWidth {
 	return C.Clay_BorderWidth{
@@ -757,6 +761,7 @@ type BorderElementConfig struct {
 	// should be > 0 for a BORDER render command to be generated.
 	Width BorderWidth
 }
+type B = BorderElementConfig
 
 func (r BorderElementConfig) C() C.Clay_BorderElementConfig {
 	return C.Clay_BorderElementConfig{
@@ -1149,7 +1154,7 @@ func MinMemorySize() uint32 {
 	return uint32(C.Clay_MinMemorySize())
 }
 
-func CreateArenaWithCapacity(capacity uint32) Arena {
+func CreateArenaWithCapacity(capacity uintptr) Arena {
 	return Arena{
 		inner: C.Clay_CreateArenaWithCapacityAndMemory(C.size_t(capacity), C.malloc(C.size_t(capacity))),
 	}

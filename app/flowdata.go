@@ -1,5 +1,10 @@
 package app
 
+import (
+	"fmt"
+	"strings"
+)
+
 type FlowValue struct {
 	Type *FlowType
 
@@ -41,6 +46,77 @@ type FlowType struct {
 	// If set, this type has been annotated as "well-known", meaning some other
 	// operations may be conveniently available on it.
 	WellKnownType FlowWellKnownType
+}
+
+func (t *FlowType) String() string {
+	switch t.WellKnownType {
+	case FSWKTFile:
+		return "File"
+	case FSWKTTimestamp:
+		return "Timestamp"
+	}
+
+	joinFields := func(fields []FlowField) string {
+		var bits []string
+		for _, f := range fields {
+			bits = append(bits, fmt.Sprintf("%s:%s", f.Name, f.Type.String()))
+		}
+		return strings.Join(bits, ", ")
+	}
+
+	switch t.Kind {
+	case FSKindAny:
+		return "Any"
+	case FSKindBytes:
+		return "Bytes"
+	case FSKindInt64:
+		return "Int64"
+	case FSKindFloat64:
+		return "Float64"
+	case FSKindList:
+		return fmt.Sprintf("List[%s]", t.ContainedType.String())
+	case FSKindRecord:
+		return fmt.Sprintf("Record[%s]", joinFields(t.Fields))
+	case FSKindTable:
+		return fmt.Sprintf("Table[%s]", joinFields(t.ContainedType.Fields))
+	default:
+		return "<UNKNOWN TYPE>"
+	}
+}
+
+func Typecheck(a, b FlowType) error {
+	// Every type matches Any.
+	if b.Kind == FSKindAny {
+		return nil
+	}
+
+	// Kinds must always match.
+	if a.Kind != b.Kind {
+		return fmt.Errorf("expected type %s, but got %s", b.String(), a.String())
+	}
+
+	switch b.Kind {
+	case FSKindBytes, FSKindInt64, FSKindFloat64:
+		// These are primitives, so if their kinds are the same, there is nothing else to check.
+	case FSKindList, FSKindTable:
+		if err := Typecheck(*a.ContainedType, *b.ContainedType); err != nil {
+			return fmt.Errorf("expected type %s, but got %s: %v", b.String(), a.String(), err)
+		}
+	case FSKindRecord:
+		if len(a.Fields) != len(b.Fields) {
+			return fmt.Errorf("record types have different number of fields")
+		}
+		for i := range a.Fields {
+			if a.Fields[i].Name != b.Fields[i].Name {
+				return fmt.Errorf("fields have different names: expected %s, got %s", b.Fields[i].Name, a.Fields[i].Name)
+			}
+			if err := Typecheck(*a.Fields[i].Type, *b.Fields[i].Type); err != nil {
+				return fmt.Errorf("bad type for field %s: %v", a.Fields[i].Name, err)
+			}
+		}
+	}
+
+	return nil
 }
 
 type FlowField struct {
