@@ -22,6 +22,22 @@ type FlowValueField struct {
 	Value FlowValue
 }
 
+func (v *FlowValue) ColumnValues(col int) []FlowValue {
+	if v.Type.Kind != FSKindTable {
+		panic(fmt.Errorf("value %s was not a table", v))
+	}
+
+	var res []FlowValue
+	for _, row := range v.TableValue {
+		res = append(res, row[col].Value)
+	}
+	return res
+}
+
+func (v FlowValue) String() string {
+	return "???(" + v.Type.String() + ")"
+}
+
 type FlowTypeKind int
 
 const (
@@ -49,7 +65,7 @@ type FlowType struct {
 	WellKnownType FlowWellKnownType
 }
 
-func (t *FlowType) String() string {
+func (t FlowType) String() string {
 	switch t.WellKnownType {
 	case FSWKTFile:
 		return "File"
@@ -183,6 +199,13 @@ func NewTableType(fields []FlowField) FlowType {
 	}
 }
 
+func NewAnyTableType() FlowType {
+	return FlowType{
+		Kind:          FSKindTable,
+		ContainedType: &FlowType{Kind: FSKindAny},
+	}
+}
+
 func NewBytesValue(bytes []byte) FlowValue {
 	return FlowValue{Type: &FlowType{Kind: FSKindBytes}, BytesValue: bytes}
 }
@@ -193,6 +216,10 @@ func NewStringValue(str string) FlowValue {
 
 func NewInt64Value(v int64, unit FlowUnit) FlowValue {
 	return FlowValue{Type: &FlowType{Kind: FSKindInt64, Unit: unit}, Int64Value: v}
+}
+
+func NewFloat64Value(v float64, unit FlowUnit) FlowValue {
+	return FlowValue{Type: &FlowType{Kind: FSKindFloat64, Unit: unit}, Float64Value: v}
 }
 
 func NewTimestampValue(t time.Time) FlowValue {

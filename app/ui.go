@@ -30,6 +30,9 @@ var nodeTypes = []NodeType{
 	{"Lines", func() *Node { return NewLinesNode() }},
 	{"Load File", func() *Node { return NewLoadFileNode("") }},
 	{"Trim Spaces", func() *Node { return NewTrimSpacesNode() }},
+	{"Min", func() *Node { return NewAggregateNode("Min") }},
+	{"Max", func() *Node { return NewAggregateNode("Max") }},
+	{"Mean (Average)", func() *Node { return NewAggregateNode("Mean") }},
 }
 
 func SearchNodeTypes(search string) []NodeType {
@@ -491,6 +494,10 @@ func UIFlowValue(v FlowValue) {
 			str = fmt.Sprintf("%d", v.Int64Value)
 		}
 		clay.TEXT(str, clay.TextElementConfig{TextColor: White})
+	case FSKindFloat64:
+		var str string
+		str = fmt.Sprintf("%v", v.Float64Value)
+		clay.TEXT(str, clay.TextElementConfig{TextColor: White})
 	case FSKindList:
 		clay.CLAY_AUTO_ID(clay.EL{ // list items
 			Layout: clay.LAY{LayoutDirection: clay.TopToBottom, ChildGap: S1},
@@ -671,6 +678,15 @@ func (d *UIDropdown) GetOption(i int) UIDropdownOption {
 
 func (d *UIDropdown) GetSelectedOption() UIDropdownOption {
 	return d.GetOption(d.Selected)
+}
+
+func (d *UIDropdown) SelectByName(name string) {
+	for i, opt := range d.Options {
+		if opt.Name == name {
+			d.Selected = i
+			break
+		}
+	}
 }
 
 func (d *UIDropdown) SelectByValue(v any) {
