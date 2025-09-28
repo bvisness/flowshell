@@ -51,12 +51,13 @@ func PD(t, r, b, l uint16, padding clay.Padding) clay.Padding {
 	}
 }
 
-var BA = clay.BorderWidth{Left: 1, Right: 1, Top: 1, Bottom: 1}
-var BA2 = clay.BorderWidth{Left: 2, Right: 2, Top: 2, Bottom: 2}
-var BTW = clay.BorderWidth{BetweenChildren: 1}
+var BA = clay.BW{Left: 1, Right: 1, Top: 1, Bottom: 1}
+var BA2 = clay.BW{Left: 2, Right: 2, Top: 2, Bottom: 2}
+var BTW = clay.BW{BetweenChildren: 1}
+var BA_BTW = clay.BW{Left: 1, Right: 1, Top: 1, Bottom: 1, BetweenChildren: 1}
 
-func BW(t, r, b, l uint16) clay.BorderWidth {
-	return clay.BorderWidth{
+func BW(t, r, b, l uint16) clay.BW {
+	return clay.BW{
 		Left:   l,
 		Right:  r,
 		Top:    t,

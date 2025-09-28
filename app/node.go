@@ -186,7 +186,13 @@ func (n *Node) UpdateLayoutInfo() {
 	n.InputPortPositions = make([]V2, len(n.InputPorts))
 	n.OutputPortPositions = make([]V2, len(n.OutputPorts))
 
-	bboxNode := util.Must1B(clay.GetElementData(n.ClayID())).BoundingBox
+	nodeData, ok := clay.GetElementData(n.ClayID())
+	if !ok {
+		// This node has not been rendered yet. That's fine. Maybe it was just added.
+		return
+	}
+
+	bboxNode := nodeData.BoundingBox
 	for i := range n.InputPorts {
 		if portData, ok := clay.GetElementData(PortAnchorID(n, false, i)); ok {
 			bboxPort := portData.BoundingBox

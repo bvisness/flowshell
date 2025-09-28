@@ -2,12 +2,14 @@ package app
 
 import (
 	"fmt"
+	"runtime"
 	"slices"
 	"time"
 
 	"github.com/bvisness/flowshell/clay"
 	"github.com/bvisness/flowshell/util"
 	rl "github.com/gen2brain/raylib-go/raylib"
+	"github.com/lithammer/fuzzysearch/fuzzy"
 )
 
 const MenuMinWidth = 200
@@ -15,27 +17,49 @@ const MenuMaxWidth = 0 // no max
 
 const NodeMinWidth = 360
 
-var nodes = []*Node{
-	NewRunProcessNode("curl https://bvisness.me/about/"),
-	NewListFilesNode("."),
-	NewLinesNode(),
-	NewLoadFileNode("go.mod"),
-	NewTrimSpacesNode(),
+var nodes []*Node
+
+type NodeType struct {
+	Name   string
+	Create func() *Node
 }
 
-func init() {
-	nodes[0].Pos = V2{10, 10}
-	nodes[1].Pos = V2{400, 10}
-	nodes[2].Pos = V2{400, 200}
-	nodes[3].Pos = V2{10, 200}
+var nodeTypes = []NodeType{
+	{"Run Process", func() *Node { return NewRunProcessNode(util.Tern(runtime.GOOS == "Windows", "dir", "ls")) }},
+	{"List Files", func() *Node { return NewListFilesNode(".") }},
+	{"Lines", func() *Node { return NewLinesNode() }},
+	{"Load File", func() *Node { return NewLoadFileNode("") }},
+	{"Trim Spaces", func() *Node { return NewTrimSpacesNode() }},
 }
 
-var wires = []*Wire{
-	{
-		StartNode: nodes[0], StartPort: 0,
-		EndNode: nodes[2], EndPort: 0,
-	},
+func SearchNodeTypes(search string) []NodeType {
+	var names []string
+	for _, t := range nodeTypes {
+		names = append(names, t.Name)
+	}
+
+	if search == "" || search == "?" || search == "*" {
+		return nodeTypes
+	}
+
+	ranks := fuzzy.RankFindFold(search, names)
+	slices.SortStableFunc(ranks, func(a, b fuzzy.Rank) int {
+		return a.Distance - b.Distance
+	})
+	var res []NodeType
+nextrank:
+	for _, rank := range ranks {
+		for _, t := range nodeTypes {
+			if t.Name == rank.Target {
+				res = append(res, t)
+				continue nextrank
+			}
+		}
+	}
+	return res
 }
+
+var wires []*Wire
 
 var selectedNodeID = 0
 
@@ -151,6 +175,8 @@ const PortDragRadius = 5
 var NewWireSourceNode *Node
 var NewWireSourcePort int
 
+var NewNodeName string
+
 func ui() {
 	// Sweep the graph, validating all nodes
 	// TODO: TOPOSORT
@@ -169,6 +195,95 @@ func ui() {
 			for _, node := range nodes {
 				UINode(node)
 			}
+
+			clay.CLAY_AUTO_ID(clay.EL{
+				Layout: clay.LAY{
+					Sizing:  GROWH,
+					Padding: PA3,
+				},
+				Floating: clay.FLOAT{
+					AttachTo: clay.AttachToParent,
+					AttachPoints: clay.FloatingAttachPoints{
+						Element: clay.AttachPointLeftBottom,
+						Parent:  clay.AttachPointLeftBottom,
+					},
+				},
+			}, func() {
+				clay.CLAY_AUTO_ID(clay.EL{
+					Layout: clay.LAY{
+						Sizing:   GROWH,
+						ChildGap: S2,
+					},
+				}, func() {
+					textboxID := clay.ID("NewNodeName")
+					UIButton(clay.ID("NewNode"), UIButtonConfig{
+						El: clay.EL{
+							Layout: clay.LAY{
+								Sizing:         WH(36, 36),
+								ChildAlignment: ALLCENTER,
+							},
+							Border: clay.B{Width: BA, Color: Gray},
+						},
+						OnClick: func(elementID clay.ElementID, pointerData clay.PointerData, userData any) {
+							NewNodeName = ""
+							id := textboxID
+							UIFocus = &id
+						},
+					}, func() {
+						clay.TEXT("+", clay.T{FontID: InterBold, FontSize: 36, TextColor: White})
+					})
+					if IsFocused(textboxID) {
+						UITextBox(textboxID, &NewNodeName, UITextBoxConfig{
+							El: clay.ElementDeclaration{
+								Layout: clay.LAY{
+									Sizing: GROWALL,
+								},
+							},
+							OnSubmit: func(val string) {
+								matches := SearchNodeTypes(val)
+								if len(matches) > 0 {
+									newNode := matches[0].Create()
+									newNode.Pos = V2{200, 200}
+									nodes = append(nodes, newNode)
+								}
+								UIFocus = nil
+							},
+						}, func() {
+							clay.CLAY(clay.ID("NewNodeMatches"), clay.EL{
+								Layout: clay.LAY{
+									LayoutDirection: clay.TopToBottom,
+									Sizing:          GROWH,
+								},
+								BackgroundColor: DarkGray,
+								Border:          clay.B{Width: BA_BTW, Color: Gray},
+								Floating: clay.FLOAT{
+									AttachTo: clay.AttachToParent,
+									AttachPoints: clay.FloatingAttachPoints{
+										Parent:  clay.AttachPointLeftTop,
+										Element: clay.AttachPointLeftBottom,
+									},
+								},
+							}, func() {
+								matches := SearchNodeTypes(NewNodeName)
+								for i := len(matches) - 1; i >= 0; i-- {
+									clay.CLAY_AUTO_ID(clay.EL{
+										Layout: clay.LAY{
+											Padding: PVH(S2, S3),
+											Sizing:  GROWH,
+										},
+									}, func() {
+										clay.TEXT(matches[i].Name, clay.T{
+											FontID:    util.Tern(i == 0, InterBold, InterRegular),
+											FontSize:  F3,
+											TextColor: White,
+										})
+									})
+								}
+							})
+						})
+					}
+				})
+			})
 		})
 		clay.CLAY_LATE(clay.ID("Output"), func() clay.EL {
 			return clay.EL{
@@ -468,19 +583,29 @@ func UIButton(id clay.ElementID, config UIButtonConfig, children ...func()) {
 type UITextBoxConfig struct {
 	El       clay.EL
 	Disabled bool
+
+	OnSubmit func(val string)
 }
 
-func UITextBox(id clay.ElementID, str *string, config UITextBoxConfig) {
+func UITextBox(id clay.ElementID, str *string, config UITextBoxConfig, children ...func()) {
 	if IsFocused(id) {
 		if config.Disabled {
 			UIFocus = nil
 		} else {
-			for r := rl.GetCharPressed(); r != 0; r = rl.GetCharPressed() {
-				*str = *str + string(rune(r))
-			}
-			if rl.IsKeyPressed(rl.KeyBackspace) || rl.IsKeyPressedRepeat(rl.KeyBackspace) {
-				if len(*str) > 0 {
-					*str = (*str)[:len(*str)-1]
+			if rl.IsKeyPressed(rl.KeyEnter) {
+				if config.OnSubmit != nil {
+					config.OnSubmit(*str)
+				}
+
+				UIFocus = nil
+			} else {
+				for r := rl.GetCharPressed(); r != 0; r = rl.GetCharPressed() {
+					*str = *str + string(rune(r))
+				}
+				if rl.IsKeyPressed(rl.KeyBackspace) || rl.IsKeyPressedRepeat(rl.KeyBackspace) {
+					if len(*str) > 0 {
+						*str = (*str)[:len(*str)-1]
+					}
 				}
 			}
 		}
@@ -506,12 +631,16 @@ func UITextBox(id clay.ElementID, str *string, config UITextBoxConfig) {
 		return config.El
 	}, func() {
 		clay.TEXT(*str, clay.T{TextColor: util.Tern(config.Disabled, LightGray, White)})
+		UISpacer(clay.AUTO_ID, WH(1, 16))
 		if IsFocused(id) {
-			UISpacer(clay.AUTO_ID, WH(1, 16))
 			clay.CLAY_AUTO_ID(clay.EL{
 				Layout:          clay.LAY{Sizing: WH(2, 16)},
 				BackgroundColor: White,
 			})
+		}
+
+		for _, f := range children {
+			f()
 		}
 	})
 }
