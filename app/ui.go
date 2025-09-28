@@ -626,29 +626,24 @@ func UIFlowValue(v FlowValue) {
 		})
 	case FSKindTable:
 		clay.CLAY_AUTO_ID(clay.EL{ // Table
-			Layout: clay.LAY{LayoutDirection: clay.TopToBottom},
-			Border: clay.BorderElementConfig{Width: clay.BorderWidth{Left: 1, Right: 1, Top: 1, Bottom: 1, BetweenChildren: 1}, Color: Gray},
+			Border: clay.B{Width: BA_BTW, Color: Gray},
 		}, func() {
-			clay.CLAY_AUTO_ID(clay.EL{ // Table header
-				Border: clay.BorderElementConfig{Width: BTW, Color: Gray},
-			}, func() {
-				for _, field := range v.Type.ContainedType.Fields {
-					clay.CLAY_AUTO_ID(clay.EL{
+			for col, field := range v.Type.ContainedType.Fields {
+				clay.CLAY_AUTO_ID(clay.EL{ // Table col
+					Layout: clay.LAY{LayoutDirection: clay.TopToBottom},
+					Border: clay.B{Width: BTW, Color: Gray},
+				}, func() {
+					clay.CLAY_AUTO_ID(clay.EL{ // Header cell
 						Layout: clay.LAY{Padding: PVH(S2, S3)},
 					}, func() {
 						clay.TEXT(field.Name, clay.TextElementConfig{FontID: InterSemibold, TextColor: White})
 					})
-				}
-			})
-			for _, row := range v.TableValue {
-				clay.CLAY_AUTO_ID(clay.EL{ // Table row
-					Border: clay.BorderElementConfig{Width: BTW, Color: Gray},
-				}, func() {
-					for _, field := range row {
+
+					for _, val := range v.ColumnValues(col) {
 						clay.CLAY_AUTO_ID(clay.EL{
 							Layout: clay.LAY{Padding: PVH(S2, S3)},
 						}, func() {
-							UIFlowValue(field.Value)
+							UIFlowValue(val)
 						})
 					}
 				})
