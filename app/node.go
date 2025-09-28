@@ -13,7 +13,6 @@ import (
 	"runtime"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/bvisness/flowshell/clay"
 	"github.com/bvisness/flowshell/util"
@@ -70,6 +69,10 @@ type Wire struct {
 	StartPort, EndPort int
 }
 
+func (w *Wire) Type() FlowType {
+	return w.StartNode.OutputPorts[w.StartPort].Type
+}
+
 func (n *Node) Run() <-chan struct{} {
 	if n.Running {
 		return n.done
@@ -124,6 +127,11 @@ func (n *Node) GetInputWire(port int) (*Wire, bool) {
 		}
 	}
 	return nil, false
+}
+
+func (n *Node) InputIsWired(port int) bool {
+	_, res := n.GetInputWire(port)
+	return res
 }
 
 func (n *Node) GetInputValue(port int) (FlowValue, bool, error) {
@@ -275,8 +283,11 @@ func (c *LoadFileAction) UI(n *Node) {
 			},
 		}, func() {
 			PortAnchor(n, false, 0)
-			UITextBox(clay.AUTO_ID, &c.path, clay.EL{
-				Layout: clay.LAY{Sizing: GROWH},
+			UITextBox(clay.AUTO_ID, &c.path, UITextBoxConfig{
+				El: clay.EL{
+					Layout: clay.LAY{Sizing: GROWH},
+				},
+				Disabled: n.InputIsWired(0),
 			})
 			UISpacer(clay.AUTO_ID, W2)
 			UIOutputPort(n, 0)
@@ -437,7 +448,9 @@ func (c *RunProcessAction) UI(n *Node) {
 			ChildGap:        S2,
 		},
 	}, func() {
-		UITextBox(clay.AUTO_ID, &c.CmdString, clay.EL{Layout: clay.LAY{Sizing: GROWH}})
+		UITextBox(clay.AUTO_ID, &c.CmdString, UITextBoxConfig{
+			El: clay.EL{Layout: clay.LAY{Sizing: GROWH}},
+		})
 
 		clay.CLAY_AUTO_ID(clay.EL{
 			Layout: clay.LAY{
@@ -541,7 +554,20 @@ func (c *ListFilesAction) UpdateAndValidate(n *Node) {
 }
 
 func (c *ListFilesAction) UI(n *Node) {
-	UITextBox(clay.ID("Cmd"), &c.Dir, clay.EL{Layout: clay.LAY{Sizing: GROWH}})
+	clay.CLAY_AUTO_ID(clay.EL{
+		Layout: clay.LAY{
+			Sizing:         GROWH,
+			ChildAlignment: YCENTER,
+		},
+	}, func() {
+		PortAnchor(n, false, 0)
+		UITextBox(clay.AUTO_ID, &c.Dir, UITextBoxConfig{
+			El:       clay.EL{Layout: clay.LAY{Sizing: GROWH}},
+			Disabled: n.InputIsWired(0),
+		})
+		UISpacer(clay.AUTO_ID, W2)
+		UIOutputPort(n, 0)
+	})
 }
 
 func (c *ListFilesAction) Run(n *Node) <-chan NodeActionResult {
@@ -551,7 +577,12 @@ func (c *ListFilesAction) Run(n *Node) <-chan NodeActionResult {
 		var res NodeActionResult
 		defer func() { done <- res }()
 
-		entries, err := os.ReadDir(c.Dir)
+		wireDir, hasWire, err := n.GetInputValue(0)
+		if err != nil {
+			res.Err = err
+			return
+		}
+		entries, err := os.ReadDir(util.Tern(hasWire, string(wireDir.BytesValue), c.Dir))
 		if err != nil {
 			res.Err = err
 			return
@@ -586,22 +617,6 @@ func (c *ListFilesAction) Run(n *Node) <-chan NodeActionResult {
 	}()
 
 	return done
-}
-
-func NewBytesValue(bytes []byte) FlowValue {
-	return FlowValue{Type: &FlowType{Kind: FSKindBytes}, BytesValue: bytes}
-}
-
-func NewStringValue(str string) FlowValue {
-	return FlowValue{Type: &FlowType{Kind: FSKindBytes}, BytesValue: []byte(str)}
-}
-
-func NewInt64Value(v int64, unit FlowUnit) FlowValue {
-	return FlowValue{Type: &FlowType{Kind: FSKindInt64, Unit: unit}, Int64Value: v}
-}
-
-func NewTimestampValue(t time.Time) FlowValue {
-	return FlowValue{Type: FSTimestamp, Int64Value: t.Unix()}
 }
 
 // --------------------------------
@@ -694,6 +709,109 @@ func (l *LinesAction) Run(n *Node) <-chan NodeActionResult {
 				Type:      &FlowType{Kind: FSKindList, ContainedType: &FlowType{Kind: FSKindBytes}},
 				ListValue: lines,
 			}},
+		}
+	}()
+
+	return done
+}
+
+// ---------------------------
+// Trim Spaces
+
+func NewTrimSpacesNode() *Node {
+	return &Node{
+		ID:   NewNodeID(),
+		Name: "Trim Spaces",
+
+		InputPorts: []NodePort{{
+			Name: "Text",
+			Type: FlowType{Kind: FSKindBytes},
+		}},
+		OutputPorts: []NodePort{{
+			Name: "Trimmed",
+			Type: FlowType{Kind: FSKindBytes},
+		}},
+
+		Action: &TrimSpacesAction{},
+	}
+}
+
+type TrimSpacesAction struct{}
+
+var _ NodeAction = &TrimSpacesAction{}
+
+func (c *TrimSpacesAction) UpdateAndValidate(n *Node) {
+	n.Valid = true
+
+	wire, hasWire := n.GetInputWire(0)
+	if hasWire && Typecheck(wire.Type(), NewListType(FlowType{Kind: FSKindBytes})) == nil {
+		n.InputPorts[0] = NodePort{
+			Name: "Text items",
+			Type: NewListType(FlowType{Kind: FSKindBytes}),
+		}
+		n.OutputPorts[0] = NodePort{
+			Name: "Trimmed",
+			Type: NewListType(FlowType{Kind: FSKindBytes}),
+		}
+	} else {
+		n.InputPorts[0] = NodePort{
+			Name: "Text",
+			Type: FlowType{Kind: FSKindBytes},
+		}
+		n.OutputPorts[0] = NodePort{
+			Name: "Trimmed",
+			Type: FlowType{Kind: FSKindBytes},
+		}
+	}
+
+	if !hasWire {
+		n.Valid = false
+	}
+}
+
+func (l *TrimSpacesAction) UI(n *Node) {
+	clay.CLAY_AUTO_ID(clay.EL{
+		Layout: clay.LAY{
+			Sizing:         GROWH,
+			ChildAlignment: YCENTER,
+		},
+	}, func() {
+		UIInputPort(n, 0)
+		UISpacer(clay.AUTO_ID, GROWH)
+		UIOutputPort(n, 0)
+	})
+}
+
+func (l *TrimSpacesAction) Run(n *Node) <-chan NodeActionResult {
+	done := make(chan NodeActionResult)
+
+	go func() {
+		var res NodeActionResult
+		defer func() { done <- res }()
+
+		input, ok, err := n.GetInputValue(0)
+		if !ok {
+			res.Err = errors.New("an input node is required")
+			return
+		}
+		if err != nil {
+			res.Err = err
+			return
+		}
+
+		if input.Type.Kind == FSKindBytes {
+			res = NodeActionResult{
+				Outputs: []FlowValue{NewBytesValue(bytes.TrimSpace(input.BytesValue))},
+			}
+		} else {
+			res = NodeActionResult{
+				Outputs: []FlowValue{NewListValue(
+					FlowType{Kind: FSKindBytes},
+					util.Map(input.ListValue, func(fv FlowValue) FlowValue {
+						return NewBytesValue(bytes.TrimSpace(fv.BytesValue))
+					}),
+				)},
+			}
 		}
 	}()
 

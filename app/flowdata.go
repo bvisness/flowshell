@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"strings"
+	"time"
 )
 
 type FlowValue struct {
@@ -153,4 +154,60 @@ var FSTimestamp = &FlowType{
 	Kind:          FSKindInt64,
 	Unit:          FSUnitSeconds,
 	WellKnownType: FSWKTTimestamp,
+}
+
+// ---------------------------
+// Constructors
+
+func NewListType(contained FlowType) FlowType {
+	return FlowType{
+		Kind:          FSKindList,
+		ContainedType: &contained,
+	}
+}
+
+func NewRecordType(fields []FlowField) FlowType {
+	return FlowType{
+		Kind:   FSKindRecord,
+		Fields: fields,
+	}
+}
+
+func NewTableType(fields []FlowField) FlowType {
+	return FlowType{
+		Kind: FSKindTable,
+		ContainedType: &FlowType{
+			Kind:   FSKindRecord,
+			Fields: fields,
+		},
+	}
+}
+
+func NewBytesValue(bytes []byte) FlowValue {
+	return FlowValue{Type: &FlowType{Kind: FSKindBytes}, BytesValue: bytes}
+}
+
+func NewStringValue(str string) FlowValue {
+	return FlowValue{Type: &FlowType{Kind: FSKindBytes}, BytesValue: []byte(str)}
+}
+
+func NewInt64Value(v int64, unit FlowUnit) FlowValue {
+	return FlowValue{Type: &FlowType{Kind: FSKindInt64, Unit: unit}, Int64Value: v}
+}
+
+func NewTimestampValue(t time.Time) FlowValue {
+	return FlowValue{Type: FSTimestamp, Int64Value: t.Unix()}
+}
+
+func NewListValue(contained FlowType, items []FlowValue) FlowValue {
+	t := NewListType(contained)
+	for _, item := range items {
+		if err := Typecheck(*item.Type, contained); err != nil {
+			panic(err)
+		}
+	}
+	return FlowValue{
+		Type:      &t,
+		ListValue: items,
+	}
 }

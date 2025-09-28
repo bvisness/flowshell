@@ -20,6 +20,7 @@ var nodes = []*Node{
 	NewListFilesNode("."),
 	NewLinesNode(),
 	NewLoadFileNode("go.mod"),
+	NewTrimSpacesNode(),
 }
 
 func init() {
@@ -81,16 +82,31 @@ func beforeLayout() {
 		}
 
 		// Starting new wires
-		for i, outputPortPos := range n.OutputPortPositions {
+		for i, portPos := range n.OutputPortPositions {
 			portRect := rl.Rectangle{
-				X:      outputPortPos.X - PortDragRadius,
-				Y:      outputPortPos.Y - PortDragRadius,
+				X:      portPos.X - PortDragRadius,
+				Y:      portPos.Y - PortDragRadius,
 				Width:  PortDragRadius * 2,
 				Height: PortDragRadius * 2,
 			}
 			if drag.TryStartDrag(NewWireDragKey, portRect, V2{}) {
 				NewWireSourceNode = n
 				NewWireSourcePort = i
+			}
+		}
+		for i, portPos := range n.InputPortPositions {
+			portRect := rl.Rectangle{
+				X:      portPos.X - PortDragRadius,
+				Y:      portPos.Y - PortDragRadius,
+				Width:  PortDragRadius * 2,
+				Height: PortDragRadius * 2,
+			}
+			if wire, hasWire := n.GetInputWire(i); hasWire {
+				if drag.TryStartDrag(NewWireDragKey, portRect, V2{}) {
+					wires = slices.DeleteFunc(wires, func(w *Wire) bool { return w == wire })
+					NewWireSourceNode = wire.StartNode
+					NewWireSourcePort = wire.StartPort
+				}
 			}
 		}
 	}
@@ -418,18 +434,23 @@ func UIButton(id clay.ElementID, config UIButtonConfig, children ...func()) {
 	})
 }
 
-func UITextBox(id clay.ElementID, str *string, decl clay.ElementDeclaration) {
-	decl.Border = clay.BorderElementConfig{Width: BA, Color: Gray}
-	decl.Layout.Padding = PVH(S1, S2)
-	decl.BackgroundColor = DarkGray
+type UITextBoxConfig struct {
+	El       clay.EL
+	Disabled bool
+}
+
+func UITextBox(id clay.ElementID, str *string, config UITextBoxConfig) {
+	config.El.Border = clay.BorderElementConfig{Width: BA, Color: Gray}
+	config.El.Layout.Padding = PVH(S1, S2)
+	config.El.BackgroundColor = DarkGray
 
 	clay.CLAY_LATE(id, func() clay.EL {
 		if clay.Hovered() {
 			UICursor = rl.MouseCursorIBeam
 		}
-		return decl
+		return config.El
 	}, func() {
-		clay.TEXT(*str, clay.TextElementConfig{TextColor: White})
+		clay.TEXT(*str, clay.TextElementConfig{TextColor: util.Tern(config.Disabled, LightGray, White)})
 	})
 }
 
