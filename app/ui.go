@@ -261,6 +261,7 @@ func ui() {
 	}, func() {
 		clay.CLAY(clay.ID("NodeCanvas"), clay.EL{
 			Layout: clay.LAY{Sizing: GROWALL},
+			Clip:   clay.CLIP{Horizontal: true, Vertical: true},
 		}, func() {
 			for _, node := range nodes {
 				UINode(node)
@@ -375,6 +376,7 @@ func ui() {
 					// After UI: focus textbox
 					if shortcut && !IsFocused(textboxID) {
 						UIFocus = &textboxID
+						NewNodeName = ""
 						shortcut = false
 					}
 				})
@@ -473,6 +475,7 @@ func UINode(node *Node) {
 		Floating: clay.FloatingElementConfig{
 			AttachTo: clay.AttachToParent,
 			Offset:   clay.Vector2(node.Pos),
+			ClipTo:   clay.ClipToAttachedParent,
 		},
 
 		Layout: clay.LAY{
