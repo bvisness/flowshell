@@ -73,7 +73,7 @@ func (w *Wire) Type() FlowType {
 	return w.StartNode.OutputPorts[w.StartPort].Type
 }
 
-func (n *Node) Run() <-chan struct{} {
+func (n *Node) Run(rerunInputs bool) <-chan struct{} {
 	if n.Running {
 		return n.done
 	}
@@ -86,12 +86,25 @@ func (n *Node) Run() <-chan struct{} {
 		// Wait on input ports
 		var inputRuns []<-chan struct{}
 		for _, inputNode := range NodeInputs(n) {
-			if !inputNode.ResultAvailable {
-				inputRuns = append(inputRuns, inputNode.Run())
+			if rerunInputs || !inputNode.ResultAvailable {
+				inputRuns = append(inputRuns, inputNode.Run(rerunInputs))
 			}
 		}
 		for _, inputRun := range inputRuns {
 			<-inputRun
+		}
+
+		// If any inputs have errors, stop.
+		for _, inputNode := range NodeInputs(n) {
+			if !inputNode.ResultAvailable {
+				panic(fmt.Errorf("input node %s should have had a result", inputNode))
+			}
+			if inputNode.Result.Err != nil {
+				n.Running = false
+				n.done <- struct{}{}
+				n.done = nil
+				return
+			}
 		}
 
 		// Run action

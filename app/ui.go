@@ -282,12 +282,30 @@ func UINode(node *Node) {
 			}
 
 			playButtonDisabled := !node.Valid || node.Running
+			UIButton(clay.AUTO_ID, // Retry / play-all button
+				UIButtonConfig{
+					El:       clay.EL{Layout: clay.LAY{Padding: PA1}},
+					Disabled: playButtonDisabled,
+					OnClick: func(elementID clay.ElementID, pointerData clay.PointerData, userData any) {
+						node.Run(true)
+					},
+				},
+				func() {
+					UIImage(clay.AUTO_ID, ImgRetry, clay.EL{
+						BackgroundColor: util.Tern(playButtonDisabled, LightGray, Blue),
+					})
+
+					if clay.Hovered() {
+						UITooltip("Run command and inputs")
+					}
+				},
+			)
 			UIButton(clay.AUTO_ID, // Play button
 				UIButtonConfig{
 					El:       clay.EL{Layout: clay.LAY{Padding: PA1}},
 					Disabled: playButtonDisabled,
 					OnClick: func(elementID clay.ElementID, pointerData clay.PointerData, userData any) {
-						node.Run()
+						node.Run(false)
 					},
 				},
 				func() {
@@ -591,7 +609,7 @@ func UIImage(id clay.ElementID, img rl.Texture2D, decl clay.EL) {
 }
 
 func UITooltip(msg string) {
-	clay.CLAY(clay.ID("Tooltip"), clay.EL{
+	clay.CLAY_AUTO_ID(clay.EL{
 		Floating: clay.FloatingElementConfig{
 			AttachTo: clay.AttachToRoot,
 			Offset:   clay.V2(rl.GetMousePosition()).Plus(clay.V2{0, 28}),
