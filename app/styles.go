@@ -1,6 +1,10 @@
 package app
 
-import "github.com/bvisness/flowshell/clay"
+import (
+	"math"
+
+	"github.com/bvisness/flowshell/clay"
+)
 
 var Night = clay.Color{12, 14, 17, 255}
 var Charcoal = clay.Color{20, 22, 25, 255}
@@ -95,4 +99,4 @@ var XCENTER = clay.ChildAlignment{X: clay.AlignXCenter}
 var YCENTER = clay.ChildAlignment{Y: clay.AlignYCenter}
 var ALLCENTER = clay.ChildAlignment{X: clay.AlignXCenter, Y: clay.AlignYCenter}
 
-const ZTOP = 1000
+const ZTOP = math.MaxInt16

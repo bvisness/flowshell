@@ -508,6 +508,24 @@ func UINode(node *Node) {
 			}
 
 			playButtonDisabled := !node.Valid || node.Running
+
+			UIButton(clay.AUTO_ID, // Pin button
+				UIButtonConfig{
+					El: clay.EL{Layout: clay.LAY{Padding: PA1}},
+					OnClick: func(elementID clay.ElementID, pointerData clay.PointerData, userData any) {
+						node.Pinned = !node.Pinned
+					},
+				},
+				func() {
+					UIImage(clay.AUTO_ID, util.Tern(node.Pinned, ImgPushpin, ImgPushpinOutline), clay.EL{
+						BackgroundColor: Red,
+					})
+
+					if clay.Hovered() {
+						UITooltip("Pin command (prevent automatic re-runs)")
+					}
+				},
+			)
 			UIButton(clay.AUTO_ID, // Retry / play-all button
 				UIButtonConfig{
 					El:       clay.EL{Layout: clay.LAY{Padding: PA1}},

@@ -25,9 +25,10 @@ import (
 type V2 = rl.Vector2
 
 type Node struct {
-	ID   int
-	Pos  V2
-	Name string
+	ID     int
+	Pos    V2
+	Name   string
+	Pinned bool
 
 	InputPorts  []NodePort
 	OutputPorts []NodePort
@@ -117,7 +118,8 @@ func (n *Node) Run(rerunInputs bool) <-chan struct{} {
 		// Wait on input ports
 		var inputRuns []<-chan struct{}
 		for _, inputNode := range NodeInputs(n) {
-			if rerunInputs || !inputNode.ResultAvailable {
+			rerunThisNode := rerunInputs && !inputNode.Pinned
+			if rerunThisNode || !inputNode.ResultAvailable {
 				fmt.Printf("Node %s wants node %s to run\n", n, inputNode)
 				inputRuns = append(inputRuns, inputNode.Run(rerunInputs))
 			}
@@ -425,9 +427,14 @@ func (c *LoadFileAction) Run(n *Node) <-chan NodeActionResult {
 			for _, row := range rows[1:] {
 				var flowRow []FlowValueField
 				for col, value := range row {
+					floatVal, err := strconv.ParseFloat(value, 64)
+					if err != nil {
+						res.Err = err
+						return
+					}
 					flowRow = append(flowRow, FlowValueField{
 						Name:  rows[0][col],
-						Value: util.Tern(c.csvNumbers, NewFloat64Value(util.Must1(strconv.ParseFloat(value, 64)), 0), NewStringValue(value)),
+						Value: util.Tern(c.csvNumbers, NewFloat64Value(floatVal, 0), NewStringValue(value)),
 					})
 				}
 				tableRows = append(tableRows, flowRow)
