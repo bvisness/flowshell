@@ -33,6 +33,10 @@ func WH(w, h float32) clay.Sizing {
 	}
 }
 
+func PX(n float32) clay.SizingAxis {
+	return clay.SizingFixed(n)
+}
+
 var PA1 = clay.PaddingAll(S1)
 var PA2 = clay.PaddingAll(S2)
 var PA3 = clay.PaddingAll(S3)
@@ -55,6 +59,10 @@ func PD(t, r, b, l uint16, padding clay.Padding) clay.Padding {
 	}
 }
 
+var BL = clay.BW{Left: 1}
+var BR = clay.BW{Right: 1}
+var BT = clay.BW{Top: 1}
+var BB = clay.BW{Bottom: 1}
 var BA = clay.BW{Left: 1, Right: 1, Top: 1, Bottom: 1}
 var BA2 = clay.BW{Left: 2, Right: 2, Top: 2, Bottom: 2}
 var BTW = clay.BW{BetweenChildren: 1}

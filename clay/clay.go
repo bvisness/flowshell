@@ -522,6 +522,7 @@ type ImageElementConfig struct {
 	// the renderer.
 	ImageData any
 }
+type IMG = ImageElementConfig
 
 func (r ImageElementConfig) C() C.Clay_ImageElementConfig {
 	var imageHandlePtr unsafe.Pointer

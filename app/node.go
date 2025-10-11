@@ -45,6 +45,13 @@ type Node struct {
 	InputPortPositions  []V2
 	OutputPortPositions []V2
 	DragRect            rl.Rectangle
+
+	// Map from output port name to output state. Names are used because they are
+	// more stable than port number in the face of polymorhpic nodes.
+	//
+	// (It is an open design question whether we want any of this state to reset
+	// when re-running the node. For now I say no resets.)
+	outputState map[string]*NodeOutputState
 }
 
 func (n *Node) String() string {
@@ -63,9 +70,25 @@ func (n *Node) DragKey() string {
 	return fmt.Sprintf("Node#%d", n.ID)
 }
 
+func (n *Node) GetOutputState(portName string) *NodeOutputState {
+	if existing, ok := n.outputState[portName]; ok {
+		return existing
+	}
+	newState := &NodeOutputState{}
+	if n.outputState == nil {
+		n.outputState = make(map[string]*NodeOutputState)
+	}
+	n.outputState[portName] = newState
+	return newState
+}
+
 type NodePort struct {
 	Name string
 	Type FlowType
+}
+
+type NodeOutputState struct {
+	Collapsed bool
 }
 
 type Wire struct {

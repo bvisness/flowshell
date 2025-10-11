@@ -262,7 +262,7 @@ func ui() {
 	clay.CLAY(clay.ID("Background"), clay.EL{
 		Layout:          clay.LAY{Sizing: GROWALL},
 		BackgroundColor: Night,
-		Border:          clay.BorderElementConfig{Width: BTW, Color: Gray},
+		Border:          clay.BorderElementConfig{Width: BTW, Color: LightGray},
 	}, func() {
 		clay.CLAY(clay.ID("NodeCanvas"), clay.EL{
 			Layout: clay.LAY{Sizing: GROWALL},
@@ -411,8 +411,40 @@ func ui() {
 								panic(err)
 							}
 
-							clay.TEXT(port.Name, clay.TextElementConfig{FontID: InterSemibold, TextColor: White})
-							UIFlowValue(output)
+							outputState := selectedNode.GetOutputState(port.Name)
+
+							clay.CLAY_AUTO_ID(clay.EL{
+								Layout: clay.LAY{ChildGap: S1, ChildAlignment: YCENTER},
+							}, func() {
+								UIButton(clay.AUTO_ID, UIButtonConfig{
+									OnClick: func(elementID clay.ElementID, pointerData clay.PointerData, userData any) {
+										outputState.Collapsed = !outputState.Collapsed
+									},
+								}, func() {
+									UIImage(clay.AUTO_ID, util.Tern(outputState.Collapsed, ImgToggleRight, ImgToggleDown), clay.EL{})
+								})
+								clay.TEXT(port.Name, clay.TextElementConfig{FontID: InterSemibold, TextColor: White})
+							})
+							if !outputState.Collapsed {
+								clay.CLAY_AUTO_ID(clay.EL{
+									Layout: clay.LAY{ChildGap: S1},
+								}, func() {
+									clay.CLAY_AUTO_ID(clay.EL{
+										Layout: clay.LAY{
+											Sizing:         clay.Sizing{Width: PX(float32(ImgToggleDown.Width)), Height: GROWV.Height},
+											ChildAlignment: XCENTER,
+										},
+									}, func() {
+										clay.CLAY_AUTO_ID(clay.EL{
+											Layout: clay.LAY{
+												Sizing: clay.Sizing{Width: PX(1), Height: GROWV.Height},
+											},
+											Border: clay.B{Color: Gray, Width: BR},
+										})
+									})
+									UIFlowValue(output)
+								})
+							}
 						}
 					} else {
 						clay.TEXT(result.Err.Error(), clay.TextElementConfig{TextColor: Red})

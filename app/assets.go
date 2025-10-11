@@ -17,6 +17,8 @@ var ImgPushpin rl.Texture2D
 var ImgPushpinOutline rl.Texture2D
 var ImgDropdownDown rl.Texture2D
 var ImgDropdownUp rl.Texture2D
+var ImgToggleRight rl.Texture2D
+var ImgToggleDown rl.Texture2D
 
 // In a separate function because raylib must be initialized first.
 func initImages() {
@@ -26,6 +28,8 @@ func initImages() {
 	ImgPushpinOutline = LoadAssetTexture("assets/pushpin-outline-white.png")
 	ImgDropdownDown = LoadAssetTexture("assets/dropdown-down.png")
 	ImgDropdownUp = LoadAssetTexture("assets/dropdown-up.png")
+	ImgToggleRight = LoadAssetTexture("assets/toggle-right.png")
+	ImgToggleDown = LoadAssetTexture("assets/toggle-down.png")
 }
 
 func LoadAssetTexture(path string) rl.Texture2D {
