@@ -101,6 +101,14 @@ func (t FlowType) String() string {
 	}
 }
 
+func (FlowType) Serialize(s *Serializer, t *FlowType) error {
+	SInt(s, &t.Kind)
+	SMaybeThing(s, &t.ContainedType)
+	SSlice(s, &t.Fields)
+	SInt(s, &t.Unit)
+	return s.Err
+}
+
 func Typecheck(a, b FlowType) error {
 	// Every type matches Any.
 	if b.Kind == FSKindAny {
@@ -139,6 +147,12 @@ func Typecheck(a, b FlowType) error {
 type FlowField struct {
 	Name string
 	Type *FlowType
+}
+
+func (FlowField) Serialize(s *Serializer, f *FlowField) error {
+	SStr(s, &f.Name)
+	SMaybeThing(s, &f.Type)
+	return s.Err
 }
 
 type FlowUnit int

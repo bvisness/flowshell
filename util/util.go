@@ -1,6 +1,11 @@
 package util
 
-import "golang.org/x/exp/constraints"
+import (
+	"errors"
+	"fmt"
+
+	"golang.org/x/exp/constraints"
+)
 
 func Tern[T any](cond bool, a, b T) T {
 	if cond {
@@ -34,6 +39,16 @@ func Must1B[T any](v T, ok bool) T {
 		panic("expected ok")
 	}
 	return v
+}
+
+func Assert(cond bool, msgAndArgs ...any) {
+	if !cond {
+		msg := "assertion failed"
+		if len(msgAndArgs) > 0 {
+			msg += fmt.Sprintf(": "+msgAndArgs[0].(string), msgAndArgs[1:]...)
+		}
+		panic(errors.New(msg))
+	}
 }
 
 func Min[T constraints.Ordered](a, b T) T {
