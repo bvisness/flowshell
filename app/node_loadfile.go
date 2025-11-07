@@ -13,6 +13,7 @@ import (
 	"github.com/bvisness/flowshell/util"
 )
 
+// GEN:NodeAction
 type LoadFileAction struct {
 	path string
 
@@ -205,20 +206,21 @@ func (c *LoadFileAction) Run(n *Node) <-chan NodeActionResult {
 	return done
 }
 
-var _ Serializable[LoadFileAction] = LoadFileAction{}
-
-func (LoadFileAction) Serialize(s *Serializer, n *LoadFileAction) error {
+func (n *LoadFileAction) Serialize(s *Serializer) bool {
 	SStr(s, &n.path)
 	SBool(s, &n.csvNumbers)
 
 	if s.Encode {
 		s.WriteStr(n.format.GetSelectedOption().Name)
 	} else {
-		selected, _ := s.ReadStr()
+		selected, ok := s.ReadStr()
+		if !ok {
+			return false
+		}
 		n.format = UIDropdown{Options: loadFileFormatOptions}
 		n.format.SelectByName(selected)
 		util.Assert(n.format.GetSelectedOption().Name == selected, "format %s should have been selected, but %s was instead", selected, n.format.GetSelectedOption().Name)
 	}
 
-	return s.Err
+	return s.Ok()
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/bvisness/flowshell/util"
 )
 
+// GEN:NodeAction
 type ListFilesAction struct {
 	Dir string
 }
@@ -104,9 +105,7 @@ func (c *ListFilesAction) Run(n *Node) <-chan NodeActionResult {
 	return done
 }
 
-var _ Serializable[ListFilesAction] = ListFilesAction{}
-
-func (ListFilesAction) Serialize(s *Serializer, n *ListFilesAction) error {
+func (n *ListFilesAction) Serialize(s *Serializer) bool {
 	SStr(s, &n.Dir)
-	return s.Err
+	return s.Ok()
 }

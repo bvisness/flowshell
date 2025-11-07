@@ -8,6 +8,7 @@ import (
 	"github.com/bvisness/flowshell/util"
 )
 
+// GEN:NodeAction
 type AggregateAction struct {
 	ops UIDropdown
 }
@@ -154,18 +155,19 @@ func (a *AggregateAction) Run(n *Node) <-chan NodeActionResult {
 	return done
 }
 
-var _ Serializable[AggregateAction] = AggregateAction{}
-
-func (AggregateAction) Serialize(s *Serializer, n *AggregateAction) error {
+func (n *AggregateAction) Serialize(s *Serializer) bool {
 	if s.Encode {
 		s.WriteStr(n.ops.GetSelectedOption().Name)
 	} else {
-		selected, _ := s.ReadStr()
+		selected, ok := s.ReadStr()
+		if !ok {
+			return false
+		}
 		n.ops = UIDropdown{Options: aggOptions}
 		n.ops.SelectByName(selected)
 		util.Assert(n.ops.GetSelectedOption().Name == selected, "aggregate %s should have been selected, but %s was instead", selected, n.ops.GetSelectedOption().Name)
 	}
-	return s.Err
+	return s.Ok()
 }
 
 type AggOp = func(vals []FlowValue, t FlowType) (FlowValue, error)

@@ -9,6 +9,7 @@ import (
 	"github.com/bvisness/flowshell/clay"
 )
 
+// GEN:NodeAction
 type RunProcessAction struct {
 	CmdString string
 
@@ -142,9 +143,7 @@ func (c *RunProcessAction) Run(n *Node) <-chan NodeActionResult {
 	return done
 }
 
-var _ Serializable[RunProcessAction] = RunProcessAction{}
-
-func (RunProcessAction) Serialize(s *Serializer, n *RunProcessAction) error {
+func (n *RunProcessAction) Serialize(s *Serializer) bool {
 	SStr(s, &n.CmdString)
-	return s.Err
+	return s.Ok()
 }

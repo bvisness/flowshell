@@ -46,7 +46,9 @@ type Node struct {
 	outputState map[string]*NodeOutputState
 }
 
-func (Node) Serialize(s *Serializer, n *Node) {
+var _ Serializable = &Node{}
+
+func (n *Node) Serialize(s *Serializer) bool {
 	SInt(s, &n.ID)
 	SV2(s, &n.Pos)
 	SStr(s, &n.Name)
@@ -55,9 +57,22 @@ func (Node) Serialize(s *Serializer, n *Node) {
 	SSlice(s, &n.InputPorts)
 	SSlice(s, &n.OutputPorts)
 
-	// TODO: ACTIONS
+	if s.Encode {
+		s.WriteStr(n.Action.Tag())
+		n.Action.Serialize(s)
+	} else {
+		tag, ok := s.ReadStr()
+		if !ok {
+			return false
+		}
+		meta := GetNodeActionMeta(tag)
+		n.Action = meta.Alloc()
+		n.Action.Serialize(s)
+	}
 
 	// The remainder of the fields are dynamic and need not be serialized.
+
+	return s.Ok()
 }
 
 func (n *Node) String() string {
@@ -93,12 +108,12 @@ type NodePort struct {
 	Type FlowType
 }
 
-var _ Serializable[NodePort] = NodePort{}
+var _ Serializable = &NodePort{}
 
-func (NodePort) Serialize(s *Serializer, np *NodePort) error {
+func (np *NodePort) Serialize(s *Serializer) bool {
 	SStr(s, &np.Name)
 	SThing(s, &np.Type)
-	return s.Err
+	return s.Ok()
 }
 
 type NodeOutputState struct {
@@ -279,17 +294,37 @@ func (n *Node) UpdateLayoutInfo() {
 	n.DragRect = rl.Rectangle(util.Must1B(clay.GetElementData(n.DragHandleClayID())).BoundingBox)
 }
 
+// All implementations of NodeAction should be marked with `GEN:NodeAction` in
+// a comment, in order to be picked up by go:generate.
 type NodeAction interface {
 	UpdateAndValidate(n *Node)
 	UI(n *Node)
 	Run(n *Node) <-chan NodeActionResult
 	// TODO: Cancellation!
+	Tag() string // This is implemented automatically by go:generate.
+	Serializable
 }
 
 type NodeActionResult struct {
 	Outputs []FlowValue
 	Err     error
 }
+
+type NodeActionMeta struct {
+	Tag   string
+	Alloc func() NodeAction
+}
+
+func GetNodeActionMeta(tag string) NodeActionMeta {
+	for _, meta := range allNodeActions {
+		if tag == meta.Tag {
+			return meta
+		}
+	}
+	panic("unknown node action type; make sure to run go:generate")
+}
+
+// See node_actions_gen.go for the definition of allNodeActions.
 
 var nodeID = 0
 

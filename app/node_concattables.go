@@ -8,6 +8,7 @@ import (
 	"github.com/bvisness/flowshell/clay"
 )
 
+// GEN:NodeAction
 type ConcatTablesAction struct{}
 
 func NewConcatTablesNode() *Node {
@@ -158,8 +159,6 @@ func (a *ConcatTablesAction) Run(n *Node) <-chan NodeActionResult {
 	return done
 }
 
-var _ Serializable[ConcatTablesAction] = ConcatTablesAction{}
-
-func (ConcatTablesAction) Serialize(s *Serializer, n *ConcatTablesAction) error {
-	return s.Err
+func (n *ConcatTablesAction) Serialize(s *Serializer) bool {
+	return s.Ok()
 }

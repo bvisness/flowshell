@@ -9,6 +9,7 @@ import (
 	"github.com/bvisness/flowshell/util"
 )
 
+// GEN:NodeAction
 type LinesAction struct {
 	IncludeCarriageReturns bool
 }
@@ -102,9 +103,7 @@ func (l *LinesAction) Run(n *Node) <-chan NodeActionResult {
 	return done
 }
 
-var _ Serializable[LinesAction] = LinesAction{}
-
-func (LinesAction) Serialize(s *Serializer, n *LinesAction) error {
+func (n *LinesAction) Serialize(s *Serializer) bool {
 	SBool(s, &n.IncludeCarriageReturns)
-	return s.Err
+	return s.Ok()
 }

@@ -11,17 +11,17 @@ func TestSerializeNodes(t *testing.T) {
 		before := NewLoadFileNode("foo/bar")
 
 		enc := NewEncoder(1)
-		before.Serialize(enc, before)
-		assert.Nil(t, enc.Err)
+		assert.True(t, SThing(enc, before))
+		assert.True(t, enc.Ok())
 
 		buf := enc.Bytes()
-		t.Log(buf)
+		t.Log("encoded:", buf)
 
 		dec := NewDecoder(buf)
 		var after Node
-		after.Serialize(dec, &after)
+		assert.True(t, SThing(dec, &after))
 
-		assert.Nil(t, dec.Err)
+		assert.True(t, dec.Ok())
 		assert.Equal(t, *before, after)
 	})
 }

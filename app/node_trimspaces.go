@@ -8,6 +8,7 @@ import (
 	"github.com/bvisness/flowshell/util"
 )
 
+// GEN:NodeAction
 type TrimSpacesAction struct{}
 
 func NewTrimSpacesNode() *Node {
@@ -108,8 +109,6 @@ func (l *TrimSpacesAction) Run(n *Node) <-chan NodeActionResult {
 	return done
 }
 
-var _ Serializable[TrimSpacesAction] = TrimSpacesAction{}
-
-func (TrimSpacesAction) Serialize(s *Serializer, n *TrimSpacesAction) error {
-	return s.Err
+func (n *TrimSpacesAction) Serialize(s *Serializer) bool {
+	return s.Ok()
 }

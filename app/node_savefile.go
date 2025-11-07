@@ -10,6 +10,7 @@ import (
 	"github.com/bvisness/flowshell/util"
 )
 
+// GEN:NodeAction
 type SaveFileAction struct {
 	path   string
 	format UIDropdown
@@ -223,9 +224,7 @@ func (c *SaveFileAction) Run(n *Node) <-chan NodeActionResult {
 	return done
 }
 
-var _ Serializable[SaveFileAction] = SaveFileAction{}
-
-func (SaveFileAction) Serialize(s *Serializer, n *SaveFileAction) error {
+func (n *SaveFileAction) Serialize(s *Serializer) bool {
 	SStr(s, &n.path)
 
 	if s.Encode {
@@ -236,5 +235,5 @@ func (SaveFileAction) Serialize(s *Serializer, n *SaveFileAction) error {
 		n.format.SelectByName(selected)
 		util.Assert(n.format.GetSelectedOption().Name == selected, "format %s should have been selected, but %s was instead", selected, n.format.GetSelectedOption().Name)
 	}
-	return s.Err
+	return s.Ok()
 }

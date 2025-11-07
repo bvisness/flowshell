@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"io"
 
+	"github.com/bvisness/flowshell/trace"
 	"github.com/bvisness/flowshell/util"
 )
 
@@ -12,11 +13,11 @@ type Serializer struct {
 	Buf     *bytes.Buffer
 	Encode  bool
 	Version int
-	Err     error
+	Errs    []error
 }
 
-type Serializable[T any] interface {
-	Serialize(s *Serializer, v *T) error
+type Serializable interface {
+	Serialize(s *Serializer) bool
 }
 
 func NewEncoder(version int) *Serializer {
@@ -45,18 +46,21 @@ func (s *Serializer) Bytes() []byte {
 	return s.Buf.Bytes()
 }
 
-func (s *Serializer) Error(err error) error {
-	if s.Err != nil {
-		return s.Err
-	}
-
-	s.Err = err
-	return s.Err
+func (s *Serializer) Ok() bool {
+	return len(s.Errs) == 0
 }
 
-func SBool(s *Serializer, b *bool) error {
-	if s.Err != nil {
-		return s.Err
+func (s *Serializer) Error(err error) bool {
+	s.Errs = append(s.Errs, SerializeError{
+		Err:   err,
+		Stack: trace.Trace()[1:],
+	})
+	return false
+}
+
+func SBool(s *Serializer, b *bool) bool {
+	if !s.Ok() {
+		return false
 	}
 
 	if s.Encode {
@@ -69,12 +73,12 @@ func SBool(s *Serializer, b *bool) error {
 		}
 		*b = x > 0
 	}
-	return nil
+	return true
 }
 
-func SInt[T ~int | ~int32 | ~int64](s *Serializer, n *T) error {
-	if s.Err != nil {
-		return s.Err
+func SInt[T ~int | ~int32 | ~int64](s *Serializer, n *T) bool {
+	if !s.Ok() {
+		return false
 	}
 
 	if s.Encode {
@@ -92,12 +96,12 @@ func SInt[T ~int | ~int32 | ~int64](s *Serializer, n *T) error {
 		}
 		*n = T(x)
 	}
-	return nil
+	return true
 }
 
-func SUint[T ~uint | ~uint32 | ~uint64](s *Serializer, n *T) error {
-	if s.Err != nil {
-		return s.Err
+func SUint[T ~uint | ~uint32 | ~uint64](s *Serializer, n *T) bool {
+	if !s.Ok() {
+		return false
 	}
 
 	if s.Encode {
@@ -113,12 +117,12 @@ func SUint[T ~uint | ~uint32 | ~uint64](s *Serializer, n *T) error {
 		}
 		*n = T(x)
 	}
-	return nil
+	return true
 }
 
-func SFloat[T ~float32 | ~float64](s *Serializer, n *T) error {
-	if s.Err != nil {
-		return s.Err
+func SFloat[T ~float32 | ~float64](s *Serializer, n *T) bool {
+	if !s.Ok() {
+		return false
 	}
 
 	if s.Encode {
@@ -132,17 +136,17 @@ func SFloat[T ~float32 | ~float64](s *Serializer, n *T) error {
 			return s.Error(err)
 		}
 	}
-	return nil
+	return true
 }
 
-func SStr[T ~string](s *Serializer, str *T) error {
-	if s.Err != nil {
-		return s.Err
+func SStr[T ~string](s *Serializer, str *T) bool {
+	if !s.Ok() {
+		return false
 	}
 
 	strlen := len(*str)
-	if err := SInt(s, &strlen); err != nil {
-		return s.Error(err)
+	if ok := SInt(s, &strlen); !ok {
+		return false
 	}
 
 	if s.Encode {
@@ -158,42 +162,52 @@ func SStr[T ~string](s *Serializer, str *T) error {
 		}
 		*str = T(res)
 	}
-	return nil
+	return true
 }
 
-func (s *Serializer) ReadStr() (string, error) {
+func (s *Serializer) ReadStr() (string, bool) {
 	util.Assert(!s.Encode)
 	var res string
-	if err := SStr(s, &res); err != nil {
-		return "", err
+	if ok := SStr(s, &res); !ok {
+		return "", false
 	}
-	return res, nil
+	return res, true
 }
 
-func (s *Serializer) WriteStr(str string) error {
+func (s *Serializer) WriteStr(str string) bool {
 	util.Assert(s.Encode)
 	return SStr(s, &str)
 }
 
-func SThing[T Serializable[T]](s *Serializer, v *T) error {
-	var zero T
-	return T.Serialize(zero, s, v)
+func SThing[T any, PT PSerializable[T]](s *Serializer, v PT) bool {
+	if !s.Ok() {
+		return false
+	}
+	return v.Serialize(s)
 }
 
-func SMaybeThing[T Serializable[T]](s *Serializer, v **T) error {
+func SMaybeThing[T any, PT PSerializable[T]](s *Serializer, v **T) bool {
+	if !s.Ok() {
+		return false
+	}
+
 	exists := *v != nil
-	SBool(s, &exists)
+	if ok := SBool(s, &exists); !ok {
+		return false
+	}
 	if exists {
 		var newThing T
-		SThing(s, &newThing)
+		if ok := SThing(s, PT(&newThing)); !ok {
+			return false
+		}
 		*v = &newThing
 	}
-	return s.Err
+	return true
 }
 
-func SFixed[T any](s *Serializer, v *T) error {
-	if s.Err != nil {
-		return s.Err
+func SFixed[T any](s *Serializer, v *T) bool {
+	if !s.Ok() {
+		return false
 	}
 
 	if s.Encode {
@@ -205,22 +219,32 @@ func SFixed[T any](s *Serializer, v *T) error {
 			return s.Error(err)
 		}
 	}
-	return nil
+	return true
 }
 
-func SMaybeFixed[T any](s *Serializer, v **T) error {
-	exists := v != nil
-	SBool(s, &exists)
-	if exists {
-		SFixed(s, *v)
+func SMaybeFixed[T any](s *Serializer, v **T) bool {
+	if !s.Ok() {
+		return false
 	}
-	return s.Err
+
+	exists := v != nil
+	if ok := SBool(s, &exists); !ok {
+		return false
+	}
+	if exists {
+		return SFixed(s, *v)
+	}
+	return true
 }
 
-func SSlice[T Serializable[T]](s *Serializer, slice *[]T) error {
+func SSlice[T any, PT PSerializable[T]](s *Serializer, slice *[]T) bool {
+	if !s.Ok() {
+		return false
+	}
+
 	n := len(*slice)
-	if err := SInt(s, &n); err != nil {
-		return s.Error(err)
+	if ok := SInt(s, &n); !ok {
+		return false
 	}
 
 	if !s.Encode {
@@ -231,9 +255,37 @@ func SSlice[T Serializable[T]](s *Serializer, slice *[]T) error {
 		}
 	}
 	for i := range n {
-		if err := SThing(s, &(*slice)[i]); err != nil {
-			return s.Error(err)
+		if ok := SThing(s, PT(&(*slice)[i])); !ok {
+			return false
 		}
 	}
-	return s.Err
+	return true
+}
+
+// ------------------------------------
+// Errors
+
+type SerializeError struct {
+	Err   error
+	Stack trace.CallStack
+}
+
+func (e SerializeError) Error() string {
+	return e.Err.Error()
+}
+
+func (e SerializeError) Unwrap() error {
+	return e.Err
+}
+
+// --------------------------------------
+// Type utilities
+
+type PSerializable[T any] interface {
+	*T
+	Serializable
+}
+
+type PP[T any] interface {
+	**T
 }
