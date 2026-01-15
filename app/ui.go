@@ -38,6 +38,7 @@ const NodeMinWidth = 360
 var CurrentGraph = core.NewGraph()
 var CurrentFilename string
 var History *HistoryManager
+var debugFrameCount int
 
 func InitHistory() {
 	History = NewHistoryManager(CurrentGraph)
@@ -870,6 +871,7 @@ func UpdateGraph() error {
 }
 
 func UINodes(topoErr error) {
+	debugFrameCount++
 	clay.CLAY(clay.ID("NodeCanvas"), clay.EL{
 		Layout: clay.LAY{Sizing: core.GROWALL},
 	}, func() {
@@ -1999,7 +2001,7 @@ func UIGroup(group *core.Group) {
 }
 
 func UINode(node *core.Node, disabled bool) {
-	if core.DebugMode {
+	if core.DebugMode && debugFrameCount%60 == 0 {
 		fmt.Printf("DEBUG: Rendering Node %d (%s) ClayID=%v\n", node.ID, node.Name, node.ClayID())
 	}
 	// core.Node header font size
