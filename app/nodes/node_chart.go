@@ -286,20 +286,20 @@ func (c *LineChartAction) UI(n *core.Node) {
 		}
 	}
 
-	clay.CLAY(clay.IDI("ChartContent", n.ID), clay.EL{
+	clay.CLAY(clay.IDI("LineChartContent", n.ID), clay.EL{
 		Layout: clay.LAY{LayoutDirection: clay.TopToBottom, Sizing: clay.Sizing{Width: clay.SizingFixed(c.Width)}, ChildGap: core.S2},
 	}, func() {
-		clay.CLAY(clay.IDI("Settings", n.ID), clay.EL{Layout: clay.LAY{Sizing: core.GROWH, ChildGap: core.S2, ChildAlignment: core.YCENTER}}, func() {
+		clay.CLAY(clay.IDI("LineChartSettings", n.ID), clay.EL{Layout: clay.LAY{Sizing: core.GROWH, ChildGap: core.S2, ChildAlignment: core.YCENTER}}, func() {
 			clay.TEXT("X:", clay.TextElementConfig{TextColor: core.LightGray, FontID: core.InterRegular})
-			core.UITextBox(clay.IDI("XCol", n.ID), &c.XColumn, core.UITextBoxConfig{El: clay.EL{Layout: clay.LAY{Sizing: clay.Sizing{Width: clay.SizingFixed(80)}}}, OnSubmit: func(s string) { c.XColumn = s }})
+			core.UITextBox(clay.IDI("LineChartXCol", n.ID), &c.XColumn, core.UITextBoxConfig{El: clay.EL{Layout: clay.LAY{Sizing: clay.Sizing{Width: clay.SizingFixed(80)}}}, OnSubmit: func(s string) { c.XColumn = s }})
 			clay.TEXT("Y:", clay.TextElementConfig{TextColor: core.LightGray, FontID: core.InterRegular})
-			core.UITextBox(clay.IDI("YCol", n.ID), &c.YColumn, core.UITextBoxConfig{El: clay.EL{Layout: clay.LAY{Sizing: clay.Sizing{Width: clay.SizingFixed(80)}}}, OnSubmit: func(s string) { c.YColumn = s }})
+			core.UITextBox(clay.IDI("LineChartYCol", n.ID), &c.YColumn, core.UITextBoxConfig{El: clay.EL{Layout: clay.LAY{Sizing: clay.Sizing{Width: clay.SizingFixed(80)}}}, OnSubmit: func(s string) { c.YColumn = s }})
 		})
 
-		clay.CLAY(clay.IDI("ChartWrapper", n.ID), clay.EL{
+		clay.CLAY(clay.IDI("LineChartWrapper", n.ID), clay.EL{
 			Layout: clay.LAY{Sizing: core.GROWH},
 		}, func() {
-			clay.CLAY(clay.IDI("ChartArea", n.ID), clay.EL{
+			clay.CLAY(clay.IDI("LineChartArea", n.ID), clay.EL{
 				Layout:          clay.LAY{Sizing: clay.Sizing{Width: clay.SizingGrow(0, c.Width), Height: clay.SizingFixed(c.Height)}},
 				BackgroundColor: core.Black,
 				Border:          clay.B{Color: core.Gray, Width: clay.BorderWidth{Left: 1, Right: 1, Top: 1, Bottom: 1}},
@@ -321,7 +321,7 @@ func (c *LineChartAction) UI(n *core.Node) {
 			})
 
 			// Resize Handle
-			clay.CLAY(clay.IDI("ResizeHandle", n.ID), clay.EL{
+			clay.CLAY(clay.IDI("LineChartResize", n.ID), clay.EL{
 				Layout: clay.LAY{Sizing: core.WH(12, 12)},
 				Floating: clay.FloatingElementConfig{
 					AttachTo: clay.AttachToParent,
@@ -343,11 +343,11 @@ func (c *LineChartAction) UI(n *core.Node) {
 			})
 		})
 
-		clay.CLAY(clay.IDI("Ports", n.ID), clay.EL{
+		clay.CLAY(clay.IDI("LineChartPorts", n.ID), clay.EL{
 			Layout: clay.LAY{LayoutDirection: clay.LeftToRight, Sizing: core.GROWH, ChildAlignment: clay.ChildAlignment{Y: clay.AlignYCenter}, ChildGap: core.S3},
 		}, func() {
 			core.UIInputPort(n, 0)
-			clay.CLAY(clay.IDI("Spacer", n.ID), clay.EL{Layout: clay.LAY{Sizing: core.GROWH}})
+			clay.CLAY(clay.IDI("LineChartSpacer", n.ID), clay.EL{Layout: clay.LAY{Sizing: core.GROWH}})
 			core.UIOutputPort(n, 0)
 		})
 	})
@@ -465,20 +465,20 @@ func (c *BarChartAction) UI(n *core.Node) {
 		}
 	}
 
-	clay.CLAY(clay.IDI("ChartContent", n.ID), clay.EL{
+	clay.CLAY(clay.IDI("BarChartContent", n.ID), clay.EL{
 		Layout: clay.LAY{LayoutDirection: clay.TopToBottom, Sizing: clay.Sizing{Width: clay.SizingFixed(c.Width)}, ChildGap: core.S2},
 	}, func() {
-		clay.CLAY(clay.IDI("Settings", n.ID), clay.EL{Layout: clay.LAY{Sizing: core.GROWH, ChildGap: core.S2, ChildAlignment: core.YCENTER}}, func() {
+		clay.CLAY(clay.IDI("BarChartSettings", n.ID), clay.EL{Layout: clay.LAY{Sizing: core.GROWH, ChildGap: core.S2, ChildAlignment: core.YCENTER}}, func() {
 			clay.TEXT("X:", clay.TextElementConfig{TextColor: core.LightGray, FontID: core.InterRegular})
-			core.UITextBox(clay.IDI("XCol", n.ID), &c.XColumn, core.UITextBoxConfig{El: clay.EL{Layout: clay.LAY{Sizing: clay.Sizing{Width: clay.SizingFixed(80)}}}, OnSubmit: func(s string) { c.XColumn = s }})
+			core.UITextBox(clay.IDI("BarChartXCol", n.ID), &c.XColumn, core.UITextBoxConfig{El: clay.EL{Layout: clay.LAY{Sizing: clay.Sizing{Width: clay.SizingFixed(80)}}}, OnSubmit: func(s string) { c.XColumn = s }})
 			clay.TEXT("Y:", clay.TextElementConfig{TextColor: core.LightGray, FontID: core.InterRegular})
-			core.UITextBox(clay.IDI("YCol", n.ID), &c.YColumn, core.UITextBoxConfig{El: clay.EL{Layout: clay.LAY{Sizing: clay.Sizing{Width: clay.SizingFixed(80)}}}, OnSubmit: func(s string) { c.YColumn = s }})
+			core.UITextBox(clay.IDI("BarChartYCol", n.ID), &c.YColumn, core.UITextBoxConfig{El: clay.EL{Layout: clay.LAY{Sizing: clay.Sizing{Width: clay.SizingFixed(80)}}}, OnSubmit: func(s string) { c.YColumn = s }})
 		})
 
-		clay.CLAY(clay.IDI("ChartWrapper", n.ID), clay.EL{
+		clay.CLAY(clay.IDI("BarChartWrapper", n.ID), clay.EL{
 			Layout: clay.LAY{Sizing: core.GROWH},
 		}, func() {
-			clay.CLAY(clay.IDI("ChartArea", n.ID), clay.EL{
+			clay.CLAY(clay.IDI("BarChartArea", n.ID), clay.EL{
 				Layout:          clay.LAY{Sizing: clay.Sizing{Width: clay.SizingGrow(0, c.Width), Height: clay.SizingFixed(c.Height)}},
 				BackgroundColor: core.Black,
 				Border:          clay.B{Color: core.Gray, Width: clay.BorderWidth{Left: 1, Right: 1, Top: 1, Bottom: 1}},
@@ -500,7 +500,7 @@ func (c *BarChartAction) UI(n *core.Node) {
 			})
 
 			// Resize Handle
-			clay.CLAY(clay.IDI("ResizeHandle", n.ID), clay.EL{
+			clay.CLAY(clay.IDI("BarChartResize", n.ID), clay.EL{
 				Layout: clay.LAY{Sizing: core.WH(12, 12)},
 				Floating: clay.FloatingElementConfig{
 					AttachTo: clay.AttachToParent,
@@ -522,11 +522,11 @@ func (c *BarChartAction) UI(n *core.Node) {
 			})
 		})
 
-		clay.CLAY(clay.IDI("Ports", n.ID), clay.EL{
+		clay.CLAY(clay.IDI("BarChartPorts", n.ID), clay.EL{
 			Layout: clay.LAY{LayoutDirection: clay.LeftToRight, Sizing: core.GROWH, ChildAlignment: clay.ChildAlignment{Y: clay.AlignYCenter}, ChildGap: core.S3},
 		}, func() {
 			core.UIInputPort(n, 0)
-			clay.CLAY(clay.IDI("Spacer", n.ID), clay.EL{Layout: clay.LAY{Sizing: core.GROWH}})
+			clay.CLAY(clay.IDI("BarChartSpacer", n.ID), clay.EL{Layout: clay.LAY{Sizing: core.GROWH}})
 			core.UIOutputPort(n, 0)
 		})
 	})
@@ -644,19 +644,19 @@ func (c *ScatterPlotAction) UI(n *core.Node) {
 		}
 	}
 
-	clay.CLAY(clay.IDI("ChartContent", n.ID), clay.EL{
+	clay.CLAY(clay.IDI("ScatterContent", n.ID), clay.EL{
 		Layout: clay.LAY{LayoutDirection: clay.TopToBottom, Sizing: clay.Sizing{Width: clay.SizingFixed(c.Width)}, ChildGap: core.S2},
 	}, func() {
-		clay.CLAY(clay.IDI("Settings", n.ID), clay.EL{Layout: clay.LAY{Sizing: core.GROWH, ChildGap: core.S2, ChildAlignment: core.YCENTER}}, func() {
+		clay.CLAY(clay.IDI("ScatterSettings", n.ID), clay.EL{Layout: clay.LAY{Sizing: core.GROWH, ChildGap: core.S2, ChildAlignment: core.YCENTER}}, func() {
 			clay.TEXT("X:", clay.TextElementConfig{TextColor: core.LightGray, FontID: core.InterRegular})
-			core.UITextBox(clay.IDI("XCol", n.ID), &c.XColumn, core.UITextBoxConfig{El: clay.EL{Layout: clay.LAY{Sizing: clay.Sizing{Width: clay.SizingFixed(80)}}}, OnSubmit: func(s string) { c.XColumn = s }})
+			core.UITextBox(clay.IDI("ScatterXCol", n.ID), &c.XColumn, core.UITextBoxConfig{El: clay.EL{Layout: clay.LAY{Sizing: clay.Sizing{Width: clay.SizingFixed(80)}}}, OnSubmit: func(s string) { c.XColumn = s }})
 			clay.TEXT("Y:", clay.TextElementConfig{TextColor: core.LightGray, FontID: core.InterRegular})
-			core.UITextBox(clay.IDI("YCol", n.ID), &c.YColumn, core.UITextBoxConfig{El: clay.EL{Layout: clay.LAY{Sizing: clay.Sizing{Width: clay.SizingFixed(80)}}}, OnSubmit: func(s string) { c.YColumn = s }})
+			core.UITextBox(clay.IDI("ScatterYCol", n.ID), &c.YColumn, core.UITextBoxConfig{El: clay.EL{Layout: clay.LAY{Sizing: clay.Sizing{Width: clay.SizingFixed(80)}}}, OnSubmit: func(s string) { c.YColumn = s }})
 		})
-		clay.CLAY(clay.IDI("ChartWrapper", n.ID), clay.EL{
+		clay.CLAY(clay.IDI("ScatterWrapper", n.ID), clay.EL{
 			Layout: clay.LAY{Sizing: core.GROWH},
 		}, func() {
-			clay.CLAY(clay.IDI("ChartArea", n.ID), clay.EL{
+			clay.CLAY(clay.IDI("ScatterArea", n.ID), clay.EL{
 				Layout:          clay.LAY{Sizing: clay.Sizing{Width: clay.SizingGrow(0, c.Width), Height: clay.SizingFixed(c.Height)}},
 				BackgroundColor: core.Black,
 				Border:          clay.B{Color: core.Gray, Width: clay.BorderWidth{Left: 1, Right: 1, Top: 1, Bottom: 1}},
@@ -678,7 +678,7 @@ func (c *ScatterPlotAction) UI(n *core.Node) {
 			})
 
 			// Resize Handle
-			clay.CLAY(clay.IDI("ResizeHandle", n.ID), clay.EL{
+			clay.CLAY(clay.IDI("ScatterResize", n.ID), clay.EL{
 				Layout: clay.LAY{Sizing: core.WH(12, 12)},
 				Floating: clay.FloatingElementConfig{
 					AttachTo: clay.AttachToParent,
@@ -701,11 +701,11 @@ func (c *ScatterPlotAction) UI(n *core.Node) {
 		})
 
 		// Move ports inside (at bottom or top as appropriate, usually simple stacking)
-		clay.CLAY(clay.IDI("Ports", n.ID), clay.EL{
+		clay.CLAY(clay.IDI("ScatterPorts", n.ID), clay.EL{
 			Layout: clay.LAY{LayoutDirection: clay.LeftToRight, Sizing: core.GROWH, ChildAlignment: clay.ChildAlignment{Y: clay.AlignYCenter}, ChildGap: core.S3},
 		}, func() {
 			core.UIInputPort(n, 0)
-			clay.CLAY(clay.IDI("Spacer", n.ID), clay.EL{Layout: clay.LAY{Sizing: core.GROWH}}) // Push output to right
+			clay.CLAY(clay.IDI("ScatterSpacer", n.ID), clay.EL{Layout: clay.LAY{Sizing: core.GROWH}}) // Push output to right
 			core.UIOutputPort(n, 0)
 		})
 	})
