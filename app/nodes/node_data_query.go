@@ -6,9 +6,9 @@ import (
 	"strings"
 
 	"github.com/antchfx/xmlquery"
+	"github.com/bvisness/flowshell/app/core"
 	"github.com/bvisness/flowshell/clay"
 	"github.com/tidwall/gjson"
-	"github.com/bvisness/flowshell/app/core"
 )
 
 // GEN:NodeAction
@@ -89,7 +89,7 @@ func (a *JsonQueryAction) Run(n *core.Node) <-chan core.NodeActionResult {
 		case gjson.False:
 			output = core.NewInt64Value(0, 0)
 		case gjson.Null:
-			output = core.FlowValue{Type: &core.FlowType{Kind: core.FSKindAny}}
+			output = core.NewStringValue("null")
 		default: // JSON (Object/Array) -> treat as String
 			output = core.NewStringValue(res.String())
 		}
