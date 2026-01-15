@@ -76,25 +76,34 @@ func (a *JsonQueryAction) Run(n *core.Node) <-chan core.NodeActionResult {
 		}
 
 		jsonStr := string(inputVal.BytesValue)
+		// Parse using gjson
 		res := gjson.Get(jsonStr, a.Query)
-		var output core.FlowValue
 
-		switch res.Type {
-		case gjson.String:
-			output = core.NewStringValue(res.String())
-		case gjson.Number:
-			output = core.NewFloat64Value(res.Float(), 0)
-		case gjson.True:
-			output = core.NewInt64Value(1, 0)
-		case gjson.False:
-			output = core.NewInt64Value(0, 0)
-		case gjson.Null:
-			output = core.NewStringValue("null")
-		default: // JSON (Object/Array) -> treat as String
-			output = core.NewStringValue(res.String())
+		val := res.Value()
+		flowVal, err := core.NativeToFlowValue(val)
+		if err != nil {
+			ch <- core.NodeActionResult{Err: fmt.Errorf("conversion failed: %w", err)}
+			return
 		}
 
-		ch <- core.NodeActionResult{Outputs: []core.FlowValue{output}}
+		// Auto-promote List[Record] to Table
+		if flowVal.Type.Kind == core.FSKindList && flowVal.Type.ContainedType != nil && flowVal.Type.ContainedType.Kind == core.FSKindRecord {
+			// Convert ListValue to TableValue
+			var tableRows [][]core.FlowValueField
+			for _, item := range flowVal.ListValue {
+				tableRows = append(tableRows, item.RecordValue)
+			}
+
+			// Construct Table type
+			tableType := core.NewTableType(flowVal.Type.ContainedType.Fields)
+
+			flowVal = core.FlowValue{
+				Type:       &tableType,
+				TableValue: tableRows,
+			}
+		}
+
+		ch <- core.NodeActionResult{Outputs: []core.FlowValue{flowVal}}
 	}()
 	return ch
 }
