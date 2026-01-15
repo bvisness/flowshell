@@ -26,6 +26,7 @@ Clay_CustomRenderData Clay_GetRenderDataCustom(Clay_RenderData d);
 import "C"
 
 import (
+	"fmt"
 	"image/color"
 	"runtime/cgo"
 	"unsafe"
@@ -1465,10 +1466,35 @@ func hashStringWithOffset(key string, offset uint32, seed uint32) ElementID {
 	base ^= (base >> 11)
 	hash += (hash << 15)
 	base += (base << 15)
+	base += (base << 15)
 	return ElementID{
 		ID:       hash + 1,
 		Offset:   offset,
 		BaseID:   base + 1,
 		StringID: key, // Reserve the hash result of zero as "null id"
 	}
+}
+
+// With returns a new ElementID derived from this one by hashing the string suffix
+// using this ID as a seed. This is more efficient and safer than formatting strings.
+func (e ElementID) With(suffix string) ElementID {
+	return hashString(suffix, e.ID)
+}
+
+// WithI returns a new ElementID derived from this one by hashing the string suffix
+// and adding an offset, using this ID as a seed.
+func (e ElementID) WithI(suffix string, offset int) ElementID {
+	return hashStringWithOffset(suffix, uint32(offset), e.ID)
+}
+
+// IDf is a helper for ID(fmt.Sprintf(format, args...))
+func IDf(format string, args ...any) ElementID {
+	return ID(fmt.Sprintf(format, args...))
+}
+
+// IDIWith is a helper that seeds a string hash with a base integer ID, and adds an offset.
+// Equivalent to hashing "baseID-suffix" + offset.
+func IDIWith(baseID int, suffix string, offset int) ElementID {
+	// We use baseID as the seed for the string hash
+	return hashStringWithOffset(suffix, uint32(offset), uint32(baseID))
 }

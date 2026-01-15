@@ -24,9 +24,12 @@ type InputManager struct {
 	pointerDownOwnerID  uint32
 	pointerDownOwnerSet bool
 	pointerDownMaxZ     int16
+
+	MouseWheelConsumed bool
 }
 
 func (m *InputManager) BeginFrame(pointerDown bool) {
+	m.MouseWheelConsumed = false
 	m.pointerPressedThisFrame = pointerDown && !m.pointerDown
 	m.pointerReleasedThisFrame = !pointerDown && m.pointerDown
 	m.pointerDown = pointerDown

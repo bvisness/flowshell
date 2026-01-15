@@ -263,7 +263,7 @@ func (d *UIDropdown) Do(id clay.ElementID, config UIDropdownConfig) {
 		if d.open {
 			WithZIndex(Z_DROPDOWN_FG, func() {
 				// Transparent blocker to close dropdown when clicking outside
-				clay.CLAY(clay.ID(fmt.Sprintf("%d-blocker", id.ID)), clay.EL{
+				clay.CLAY(id.With("blocker"), clay.EL{
 					Layout: clay.LAY{
 						Sizing: WH(float32(rl.GetScreenWidth()), float32(rl.GetScreenHeight())),
 					},
@@ -457,58 +457,58 @@ func UIFlowValue(seed clay.ElementID, v FlowValue) {
 			str = fmt.Sprintf("%v", v.Float64Value)
 			clay.TEXT(str, clay.TextElementConfig{TextColor: White})
 		case FSKindList:
-			clay.CLAY(clay.ID(fmt.Sprintf("%d-ListGen", seed.ID)), clay.EL{ // list items
+			clay.CLAY(seed.With("ListGen"), clay.EL{ // list items
 				Layout: clay.LAY{LayoutDirection: clay.TopToBottom, ChildGap: S1},
 			}, func() {
 				for i, item := range v.ListValue {
-					itemSeed := clay.ID(fmt.Sprintf("%d-Item-%d", seed.ID, i))
+					itemSeed := seed.WithI("Item", i)
 					clay.CLAY(itemSeed, clay.EL{ // list item
 						Layout: clay.LAY{ChildGap: S2},
 					}, func() {
 						clay.TEXT(fmt.Sprintf("%d", i), clay.TextElementConfig{FontID: InterSemibold, TextColor: White})
-						UIFlowValue(clay.ID(fmt.Sprintf("%d-Val", itemSeed.ID)), item)
+						UIFlowValue(itemSeed.With("Val"), item)
 					})
 				}
 			})
 		case FSKindTable:
-			clay.CLAY(clay.ID(fmt.Sprintf("%d-TableGen", seed.ID)), clay.EL{ // Table
+			clay.CLAY(seed.With("TableGen"), clay.EL{ // Table
 				Border: clay.B{Width: BA_BTW, Color: Gray},
 			}, func() {
 				for col, field := range v.Type.ContainedType.Fields {
 					// Use proper seeding for column to avoid global collisions
-					colSeed := clay.ID(fmt.Sprintf("%d-Col-%d", seed.ID, col))
+					colSeed := seed.WithI("Col", col)
 					clay.CLAY(colSeed, clay.EL{ // Table col
 						Layout: clay.LAY{LayoutDirection: clay.TopToBottom},
 						Border: clay.B{Width: BTW, Color: Gray},
 					}, func() {
-						clay.CLAY(clay.ID(fmt.Sprintf("%d-HeaderGen-%d", seed.ID, col)), clay.EL{ // Header cell
+						clay.CLAY(colSeed.WithI("HeaderGen", col), clay.EL{ // Header cell
 							Layout: clay.LAY{Padding: PVH(S2, S3)},
 						}, func() {
 							clay.TEXT(field.Name, clay.TextElementConfig{FontID: InterSemibold, TextColor: White})
 						})
 
 						for row, val := range v.ColumnValues(col) {
-							cellSeed := clay.ID(fmt.Sprintf("%d-Cell-%d-%d", seed.ID, col, row))
+							cellSeed := colSeed.WithI("Cell", row)
 							clay.CLAY(cellSeed, clay.EL{
 								Layout: clay.LAY{Padding: PVH(S2, S3)},
 							}, func() {
-								UIFlowValue(clay.ID(fmt.Sprintf("%d-Val", cellSeed.ID)), val)
+								UIFlowValue(cellSeed.With("Val"), val)
 							})
 						}
 					})
 				}
 			})
 		case FSKindRecord:
-			clay.CLAY(clay.ID(fmt.Sprintf("%d-RecordGen", seed.ID)), clay.EL{
+			clay.CLAY(seed.With("RecordGen"), clay.EL{
 				Layout: clay.LAY{LayoutDirection: clay.TopToBottom, ChildGap: S1},
 			}, func() {
 				for i, field := range v.RecordValue {
-					fieldSeed := clay.ID(fmt.Sprintf("%d-Field-%d", seed.ID, i))
+					fieldSeed := seed.WithI("Field", i)
 					clay.CLAY(fieldSeed, clay.EL{
 						Layout: clay.LAY{ChildGap: S2, ChildAlignment: YCENTER},
 					}, func() {
 						clay.TEXT(field.Name+":", clay.TextElementConfig{FontID: InterSemibold, TextColor: LightGray})
-						UIFlowValue(clay.ID(fmt.Sprintf("%d-Val", fieldSeed.ID)), field.Value)
+						UIFlowValue(fieldSeed.With("Val"), field.Value)
 					})
 				}
 			})

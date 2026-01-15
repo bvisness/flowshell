@@ -1,6 +1,7 @@
 ﻿package nodes
 
 import (
+	"encoding/binary"
 	"fmt"
 	"math"
 	"strconv"
@@ -26,6 +27,7 @@ type ChartRenderData struct {
 	MaxX   float64
 	MinY   float64
 	MaxY   float64
+	Zoom   float32
 	Error  string
 }
 
@@ -190,6 +192,7 @@ type LineChartAction struct {
 	YColumn string
 	Width   float32
 	Height  float32
+	Zoom    float32
 }
 
 func NewLineChartNode() *core.Node {
@@ -197,7 +200,7 @@ func NewLineChartNode() *core.Node {
 		Name:        "Line Chart",
 		InputPorts:  []core.NodePort{{Name: "Data", Type: core.FlowType{Kind: core.FSKindTable}}},
 		OutputPorts: []core.NodePort{{Name: "Data", Type: core.FlowType{Kind: core.FSKindTable}}},
-		Action:      &LineChartAction{Width: 400, Height: 200},
+		Action:      &LineChartAction{Width: 400, Height: 200, Zoom: 1.0},
 	}
 }
 
@@ -210,16 +213,46 @@ func (c *LineChartAction) Serialize(s *core.Serializer) bool {
 	if s.Encode {
 		core.SFloat(s, &c.Width)
 		core.SFloat(s, &c.Height)
+		core.SFloat(s, &c.Zoom)
 	} else {
-		// safeCheck: Need 8 bytes for 2 float32s.
-		// Actually SFloat uses binary.Read which might be Fixed size. float32 is 4 bytes.
-		// If we don't have enough bytes, assume old save.
-		if s.Buf.Len() >= 8 {
+		// Heuristic to detect version:
+		// V0: No extra data (next bytes are next Node's struct)
+		// V1: Width, Height (8 bytes).
+		// V2: Width, Height, Zoom (12 bytes).
+		// Note: Next Node starts with ID (Varint).
+
+		isV1 := false
+		isV2 := false
+
+		bytes := s.Buf.Bytes()
+		if len(bytes) >= 8 {
+			w := math.Float32frombits(binary.LittleEndian.Uint32(bytes[0:4]))
+			h := math.Float32frombits(binary.LittleEndian.Uint32(bytes[4:8]))
+			// Check if sane dimensions (e.g. 50 to 5000)
+			if w >= 50 && w <= 5000 && h >= 50 && h <= 5000 {
+				isV1 = true
+				if len(bytes) >= 12 {
+					z := math.Float32frombits(binary.LittleEndian.Uint32(bytes[8:12]))
+					// Check if sane zoom (0.01 to 100)
+					if z >= 0.01 && z <= 100.0 {
+						isV2 = true
+					}
+				}
+			}
+		}
+
+		if isV2 {
 			core.SFloat(s, &c.Width)
 			core.SFloat(s, &c.Height)
+			core.SFloat(s, &c.Zoom)
+		} else if isV1 {
+			core.SFloat(s, &c.Width)
+			core.SFloat(s, &c.Height)
+			c.Zoom = 1.0
 		} else {
 			c.Width = 400
 			c.Height = 200
+			c.Zoom = 1.0
 		}
 	}
 	return s.Ok()
@@ -236,6 +269,7 @@ func (c *LineChartAction) UpdateAndValidate(n *core.Node) {
 
 func (c *LineChartAction) UI(n *core.Node) {
 	renderData := ExtractChartData(n, c.XColumn, c.YColumn, ChartTypeLine)
+	renderData.Zoom = c.Zoom
 
 	// Handle Drag
 	dragKey := ResizeDrag{NodeID: n.ID}
@@ -270,7 +304,21 @@ func (c *LineChartAction) UI(n *core.Node) {
 				BackgroundColor: core.Black,
 				Border:          clay.B{Color: core.Gray, Width: clay.BorderWidth{Left: 1, Right: 1, Top: 1, Bottom: 1}},
 				Custom:          clay.CustomElementConfig{CustomData: renderData},
-			}, func() {})
+			}, func() {
+				clay.OnHover(func(elementID clay.ElementID, pointerData clay.PointerData, _ any) {
+					wheel := rl.GetMouseWheelMove()
+					if wheel != 0 {
+						core.UIInput.MouseWheelConsumed = true
+						c.Zoom += wheel * 0.1
+						if c.Zoom < 0.1 {
+							c.Zoom = 0.1
+						}
+						if c.Zoom > 10.0 {
+							c.Zoom = 10.0
+						}
+					}
+				}, nil)
+			})
 
 			// Resize Handle
 			clay.CLAY(clay.IDI("ResizeHandle", n.ID), clay.EL{
@@ -327,6 +375,7 @@ type BarChartAction struct {
 	YColumn string
 	Width   float32
 	Height  float32
+	Zoom    float32
 }
 
 func NewBarChartNode() *core.Node {
@@ -334,7 +383,7 @@ func NewBarChartNode() *core.Node {
 		Name:        "Bar Chart",
 		InputPorts:  []core.NodePort{{Name: "Data", Type: core.FlowType{Kind: core.FSKindTable}}},
 		OutputPorts: []core.NodePort{{Name: "Data", Type: core.FlowType{Kind: core.FSKindTable}}},
-		Action:      &BarChartAction{Width: 400, Height: 200},
+		Action:      &BarChartAction{Width: 400, Height: 200, Zoom: 1.0},
 	}
 }
 
@@ -347,13 +396,39 @@ func (c *BarChartAction) Serialize(s *core.Serializer) bool {
 	if s.Encode {
 		core.SFloat(s, &c.Width)
 		core.SFloat(s, &c.Height)
+		core.SFloat(s, &c.Zoom)
 	} else {
-		if s.Buf.Len() >= 8 {
+		isV1 := false
+		isV2 := false
+
+		bytes := s.Buf.Bytes()
+		if len(bytes) >= 8 {
+			w := math.Float32frombits(binary.LittleEndian.Uint32(bytes[0:4]))
+			h := math.Float32frombits(binary.LittleEndian.Uint32(bytes[4:8]))
+			// Check if sane dimensions
+			if w >= 50 && w <= 5000 && h >= 50 && h <= 5000 {
+				isV1 = true
+				if len(bytes) >= 12 {
+					z := math.Float32frombits(binary.LittleEndian.Uint32(bytes[8:12]))
+					if z >= 0.01 && z <= 100.0 {
+						isV2 = true
+					}
+				}
+			}
+		}
+
+		if isV2 {
 			core.SFloat(s, &c.Width)
 			core.SFloat(s, &c.Height)
+			core.SFloat(s, &c.Zoom)
+		} else if isV1 {
+			core.SFloat(s, &c.Width)
+			core.SFloat(s, &c.Height)
+			c.Zoom = 1.0
 		} else {
 			c.Width = 400
 			c.Height = 200
+			c.Zoom = 1.0
 		}
 	}
 	return s.Ok()
@@ -370,6 +445,7 @@ func (c *BarChartAction) UpdateAndValidate(n *core.Node) {
 
 func (c *BarChartAction) UI(n *core.Node) {
 	renderData := ExtractChartData(n, c.XColumn, c.YColumn, ChartTypeBar)
+	renderData.Zoom = c.Zoom
 
 	// Handle Drag
 	dragKey := ResizeDrag{NodeID: n.ID}
@@ -404,7 +480,21 @@ func (c *BarChartAction) UI(n *core.Node) {
 				BackgroundColor: core.Black,
 				Border:          clay.B{Color: core.Gray, Width: clay.BorderWidth{Left: 1, Right: 1, Top: 1, Bottom: 1}},
 				Custom:          clay.CustomElementConfig{CustomData: renderData},
-			}, func() {})
+			}, func() {
+				clay.OnHover(func(elementID clay.ElementID, pointerData clay.PointerData, _ any) {
+					wheel := rl.GetMouseWheelMove()
+					if wheel != 0 {
+						core.UIInput.MouseWheelConsumed = true
+						c.Zoom += wheel * 0.1
+						if c.Zoom < 0.1 {
+							c.Zoom = 0.1
+						}
+						if c.Zoom > 10.0 {
+							c.Zoom = 10.0
+						}
+					}
+				}, nil)
+			})
 
 			// Resize Handle
 			clay.CLAY(clay.IDI("ResizeHandle", n.ID), clay.EL{
@@ -461,6 +551,7 @@ type ScatterPlotAction struct {
 	YColumn string
 	Width   float32
 	Height  float32
+	Zoom    float32
 }
 
 func NewScatterPlotNode() *core.Node {
@@ -468,7 +559,7 @@ func NewScatterPlotNode() *core.Node {
 		Name:        "Scatter Plot",
 		InputPorts:  []core.NodePort{{Name: "Data", Type: core.FlowType{Kind: core.FSKindTable}}},
 		OutputPorts: []core.NodePort{{Name: "Data", Type: core.FlowType{Kind: core.FSKindTable}}},
-		Action:      &ScatterPlotAction{Width: 400, Height: 200},
+		Action:      &ScatterPlotAction{Width: 400, Height: 200, Zoom: 1.0},
 	}
 }
 
@@ -481,13 +572,39 @@ func (c *ScatterPlotAction) Serialize(s *core.Serializer) bool {
 	if s.Encode {
 		core.SFloat(s, &c.Width)
 		core.SFloat(s, &c.Height)
+		core.SFloat(s, &c.Zoom)
 	} else {
-		if s.Buf.Len() >= 8 {
+		isV1 := false
+		isV2 := false
+
+		bytes := s.Buf.Bytes()
+		if len(bytes) >= 8 {
+			w := math.Float32frombits(binary.LittleEndian.Uint32(bytes[0:4]))
+			h := math.Float32frombits(binary.LittleEndian.Uint32(bytes[4:8]))
+			// Check if sane dimensions
+			if w >= 50 && w <= 5000 && h >= 50 && h <= 5000 {
+				isV1 = true
+				if len(bytes) >= 12 {
+					z := math.Float32frombits(binary.LittleEndian.Uint32(bytes[8:12]))
+					if z >= 0.01 && z <= 100.0 {
+						isV2 = true
+					}
+				}
+			}
+		}
+
+		if isV2 {
 			core.SFloat(s, &c.Width)
 			core.SFloat(s, &c.Height)
+			core.SFloat(s, &c.Zoom)
+		} else if isV1 {
+			core.SFloat(s, &c.Width)
+			core.SFloat(s, &c.Height)
+			c.Zoom = 1.0
 		} else {
 			c.Width = 400
 			c.Height = 200
+			c.Zoom = 1.0
 		}
 	}
 	return s.Ok()
@@ -504,6 +621,7 @@ func (c *ScatterPlotAction) UpdateAndValidate(n *core.Node) {
 
 func (c *ScatterPlotAction) UI(n *core.Node) {
 	renderData := ExtractChartData(n, c.XColumn, c.YColumn, ChartTypeScatter)
+	renderData.Zoom = c.Zoom
 
 	// Handle Drag
 	dragKey := ResizeDrag{NodeID: n.ID}
@@ -537,7 +655,21 @@ func (c *ScatterPlotAction) UI(n *core.Node) {
 				BackgroundColor: core.Black,
 				Border:          clay.B{Color: core.Gray, Width: clay.BorderWidth{Left: 1, Right: 1, Top: 1, Bottom: 1}},
 				Custom:          clay.CustomElementConfig{CustomData: renderData},
-			}, func() {})
+			}, func() {
+				clay.OnHover(func(elementID clay.ElementID, pointerData clay.PointerData, _ any) {
+					wheel := rl.GetMouseWheelMove()
+					if wheel != 0 {
+						core.UIInput.MouseWheelConsumed = true
+						c.Zoom += wheel * 0.1
+						if c.Zoom < 0.1 {
+							c.Zoom = 0.1
+						}
+						if c.Zoom > 10.0 {
+							c.Zoom = 10.0
+						}
+					}
+				}, nil)
+			})
 
 			// Resize Handle
 			clay.CLAY(clay.IDI("ResizeHandle", n.ID), clay.EL{
@@ -605,9 +737,23 @@ func RenderChart(bbox clay.BoundingBox, data *ChartRenderData) {
 	xRange := data.MaxX - data.MinX
 	yRange := data.MaxY - data.MinY
 
+	midX := data.MinX + xRange/2
+	midY := data.MinY + yRange/2
+
+	zoom := float64(data.Zoom)
+	if zoom <= 0 {
+		zoom = 1.0
+	}
+
+	effXRange := xRange / zoom
+	effYRange := yRange / zoom
+
+	effMinX := midX - effXRange/2
+	effMinY := midY - effYRange/2
+
 	mapPt := func(pt rl.Vector2) rl.Vector2 {
-		x := (float64(pt.X) - data.MinX) / xRange
-		y := (float64(pt.Y) - data.MinY) / yRange
+		x := (float64(pt.X) - effMinX) / effXRange
+		y := (float64(pt.Y) - effMinY) / effYRange
 		return rl.Vector2{
 			X: bbox.X + float32(x)*width,
 			Y: bbox.Y + height - float32(y)*height,

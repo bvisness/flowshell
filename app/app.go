@@ -4,10 +4,10 @@ import (
 	"fmt"
 
 	"github.com/bvisness/flowshell/app/core"
+	"github.com/bvisness/flowshell/util"
 
 	_ "github.com/bvisness/flowshell/app/nodes"
 	"github.com/bvisness/flowshell/clay"
-	"github.com/bvisness/flowshell/util"
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
@@ -91,10 +91,8 @@ func frame() {
 
 	// Handle Zoom Input
 	wheel := rl.GetMouseWheelMove()
-	shouldZoom := wheel != 0 && !core.IsHoveringUI
-	if shouldZoom {
-		Camera.ZoomAt(rl.GetMousePosition(), util.Tern(wheel > 0, float32(1.1), float32(0.9)))
-	}
+	// Preliminary check. We will confirm this at the end of the frame after UI determines if it consumed the wheel.
+	preliminaryShouldZoom := wheel != 0 && !core.IsHoveringUI
 
 	if rl.IsKeyPressed(rl.KeyF9) {
 		clay.SetDebugModeEnabled(!clay.IsDebugModeEnabled())
@@ -127,7 +125,7 @@ func frame() {
 	clay.SetLayoutDimensions(clay.D{Width: screenWidth, Height: screenHeight})
 
 	scrollDelta := clay.Vector2{X: 0, Y: 0}
-	if !shouldZoom {
+	if !preliminaryShouldZoom {
 		scrollDelta = clay.Vector2(rl.GetMouseWheelMoveV()).Times(4)
 	}
 	clay.UpdateScrollContainers(false, scrollDelta, rl.GetFrameTime())
@@ -153,6 +151,12 @@ func frame() {
 	processInput()
 
 	core.UIInput.EndFrame()
+
+	// Final check for zoom: Only zoom canvas if UI didn't consume the wheel event
+	if preliminaryShouldZoom && !core.UIInput.MouseWheelConsumed {
+		wheel := rl.GetMouseWheelMove()
+		Camera.ZoomAt(rl.GetMousePosition(), util.Tern(wheel > 0, float32(1.1), float32(0.9)))
+	}
 
 	rl.BeginDrawing()
 	rl.ClearBackground(core.Night.RGBA())
