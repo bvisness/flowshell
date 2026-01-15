@@ -55,6 +55,7 @@ func DeserializeGraph(data []byte) (*Graph, error) {
 	}
 
 	nodeMap := make(map[int]*Node)
+	seenIDs := make(map[int]bool)
 	maxID := 0
 
 	for range nodeCount {
@@ -62,6 +63,17 @@ func DeserializeGraph(data []byte) (*Graph, error) {
 		if !SThing(s, n) {
 			return nil, fmt.Errorf("failed to read node: %v", s.Errs)
 		}
+
+		// Deduplicate IDs to prevent Clay crashes
+		if seenIDs[n.ID] {
+			oldID := n.ID
+			// Heuristic: Shift ID by large amount + current count to find a likely free slot.
+			// This isn't perfect (could still collide with future nodes), but fixes the "concatenated file" case.
+			n.ID = n.ID + 100000 + len(g.Nodes)
+			fmt.Printf("Warning: Remapped duplicate Node ID %d to %d\n", oldID, n.ID)
+		}
+		seenIDs[n.ID] = true
+
 		g.AddNode(n)
 		nodeMap[n.ID] = n
 		if n.ID > maxID {

@@ -402,14 +402,17 @@ func (c *BarChartAction) Serialize(s *core.Serializer) bool {
 		isV2 := false
 
 		bytes := s.Buf.Bytes()
+
 		if len(bytes) >= 8 {
 			w := math.Float32frombits(binary.LittleEndian.Uint32(bytes[0:4]))
 			h := math.Float32frombits(binary.LittleEndian.Uint32(bytes[4:8]))
+
 			// Check if sane dimensions
 			if w >= 50 && w <= 5000 && h >= 50 && h <= 5000 {
 				isV1 = true
 				if len(bytes) >= 12 {
 					z := math.Float32frombits(binary.LittleEndian.Uint32(bytes[8:12]))
+
 					if z >= 0.01 && z <= 100.0 {
 						isV2 = true
 					}
@@ -578,14 +581,17 @@ func (c *ScatterPlotAction) Serialize(s *core.Serializer) bool {
 		isV2 := false
 
 		bytes := s.Buf.Bytes()
+
 		if len(bytes) >= 8 {
 			w := math.Float32frombits(binary.LittleEndian.Uint32(bytes[0:4]))
 			h := math.Float32frombits(binary.LittleEndian.Uint32(bytes[4:8]))
+
 			// Check if sane dimensions
 			if w >= 50 && w <= 5000 && h >= 50 && h <= 5000 {
 				isV1 = true
 				if len(bytes) >= 12 {
 					z := math.Float32frombits(binary.LittleEndian.Uint32(bytes[8:12]))
+
 					if z >= 0.01 && z <= 100.0 {
 						isV2 = true
 					}

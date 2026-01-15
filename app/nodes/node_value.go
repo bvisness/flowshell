@@ -38,6 +38,11 @@ func (c *ValueAction) UpdateAndValidate(n *core.Node) {
 	// Ensure output port type matches value type (in case it changed or for safety)
 	if n.OutputPorts[0].Type.Kind == core.FSKindAny {
 		n.OutputPorts[0].Type = *c.Value.Type
+	} else if c.Value.Type.Kind == core.FSKindAny {
+		// Backward compatibility: If we have a specific port type but the value is Any, output the port type.
+		// This happens for old files where the value type wasn't fully persisted or was default.
+		// We trust the port type more if the value is ambiguous.
+		c.Value.Type = &n.OutputPorts[0].Type
 	}
 }
 
