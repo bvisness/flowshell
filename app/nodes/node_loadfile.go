@@ -208,7 +208,7 @@ func (c *LoadFileAction) UI(n *core.Node) {
 		})
 
 		if c.Format.GetSelectedOption().Value == "csv" {
-			core.UICheckbox(clay.IDI("InferTypes", n.ID), &c.InferTypes, "Infer Types")
+			core.UICheckbox(clay.IDI("LoadFileInferTypes", n.ID), &c.InferTypes, "Infer Types")
 		}
 	})
 }

@@ -47,7 +47,7 @@ func (c *ValueAction) UpdateAndValidate(n *core.Node) {
 }
 
 func (c *ValueAction) UI(n *core.Node) {
-	clay.CLAY(clay.IDI("NodeContent", n.ID), clay.EL{
+	clay.CLAY(clay.IDI("ValueContent", n.ID), clay.EL{
 		Layout: clay.LAY{
 			Sizing:         core.GROWH,
 			ChildAlignment: core.YCENTER,

@@ -80,7 +80,7 @@ func (c *SelectColumnsAction) UpdateAndValidate(n *core.Node) {
 func (c *SelectColumnsAction) UI(n *core.Node) {
 	input, wired := n.GetInputWire(0)
 
-	clay.CLAY(clay.IDI("NodeContent", n.ID), clay.EL{
+	clay.CLAY(clay.IDI("SelectContent", n.ID), clay.EL{
 		Layout: clay.LAY{
 			LayoutDirection: clay.TopToBottom,
 			Sizing:          core.GROWH,
