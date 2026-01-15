@@ -1999,6 +1999,8 @@ func UIGroup(group *core.Group) {
 }
 
 func UINode(node *core.Node, disabled bool) {
+	// DEBUG: Check for duplicates
+	// fmt.Printf("DEBUG: Rendering Node %d (%s) ClayID=%v\n", node.ID, node.Name, node.ClayID())
 	// core.Node header font size
 	headerFontSize := uint16(core.F3)
 

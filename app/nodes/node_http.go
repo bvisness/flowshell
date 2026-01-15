@@ -45,14 +45,14 @@ func (a *HTTPRequestAction) UI(n *core.Node) {
 			Layout: clay.LAY{Sizing: core.GROWH, ChildAlignment: core.YCENTER},
 		}, func() {
 			core.UIInputPort(n, 0)
-			core.UISpacer(clay.AUTO_ID, core.GROWH)
+			core.UISpacer(clay.IDI("Spacer1", n.ID), core.GROWH)
 			core.UIOutputPort(n, 0)
 		})
 		clay.CLAY(clay.IDI("Row2", n.ID), clay.EL{
 			Layout: clay.LAY{Sizing: core.GROWH, ChildAlignment: core.YCENTER},
 		}, func() {
 			core.UIInputPort(n, 1)
-			core.UISpacer(clay.AUTO_ID, core.GROWH)
+			core.UISpacer(clay.IDI("Spacer2", n.ID), core.GROWH)
 			core.UIOutputPort(n, 1)
 		})
 		clay.CLAY(clay.IDI("Row3", n.ID), clay.EL{

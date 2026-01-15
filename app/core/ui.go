@@ -153,9 +153,9 @@ func UITextBox(id clay.ElementID, str *string, config UITextBoxConfig, children 
 	}, func() {
 		clay.TEXT(*str, clay.T{TextColor: util.Tern(config.Disabled, LightGray, White)})
 		// Fix: Use ID derived from parent ID instead of AUTO_ID
-		UISpacer(clay.IDI("Spacer", int(id.ID)), WH(1, 16))
+		UISpacer(id.With("Spacer"), WH(1, 16))
 		if IsFocused(id) {
-			clay.CLAY(clay.IDI("Cursor", int(id.ID)), clay.EL{
+			clay.CLAY(id.With("Cursor"), clay.EL{
 				Layout:          clay.LAY{Sizing: WH(2, 16)},
 				BackgroundColor: White,
 			}, func() {})
@@ -232,7 +232,7 @@ func (d *UIDropdown) Do(id clay.ElementID, config UIDropdownConfig) {
 		}, nil)
 
 		// Label wrapper with seeded ID
-		clay.CLAY(clay.IDI("LabelWrap", int(id.ID)), clay.EL{
+		clay.CLAY(id.With("LabelWrap"), clay.EL{
 			Layout: clay.LAY{
 				Padding: PVH(S1, S2),
 				Sizing:  GROWH,
@@ -242,7 +242,7 @@ func (d *UIDropdown) Do(id clay.ElementID, config UIDropdownConfig) {
 		})
 
 		// Button with seeded ID
-		UIButton(clay.IDI("ArrowBtn", int(id.ID)), UIButtonConfig{
+		UIButton(id.With("ArrowBtn"), UIButtonConfig{
 			El: clay.EL{
 				Layout: clay.LAY{
 					ChildAlignment: ALLCENTER,
@@ -255,7 +255,7 @@ func (d *UIDropdown) Do(id clay.ElementID, config UIDropdownConfig) {
 				d.open = !d.open
 			},
 		}, func() {
-			UIImage(clay.IDI("ArrowIcon", int(id.ID)), util.Tern(d.open, ImgDropdownUp, ImgDropdownDown), clay.EL{
+			UIImage(id.With("ArrowIcon"), util.Tern(d.open, ImgDropdownUp, ImgDropdownDown), clay.EL{
 				BackgroundColor: LightGray,
 			})
 		})
@@ -281,7 +281,7 @@ func (d *UIDropdown) Do(id clay.ElementID, config UIDropdownConfig) {
 				})
 
 				// Dropdown list with seeded ID
-				clay.CLAY(clay.IDI("List", int(id.ID)), clay.EL{
+				clay.CLAY(id.With("List"), clay.EL{
 					Layout: clay.LAY{
 						LayoutDirection: clay.TopToBottom,
 						Sizing:          GROWH,
@@ -313,7 +313,7 @@ func (d *UIDropdown) Do(id clay.ElementID, config UIDropdownConfig) {
 						idx := i
 						val := opt.Value
 
-						UIButton(clay.IDI("DropdownOpt", i+int(id.ID)), UIButtonConfig{
+						UIButton(id.WithI("DropdownOpt", i), UIButtonConfig{
 							El: clay.EL{
 								Layout: clay.LAY{
 									Padding: PVH(S1, S2),
@@ -368,7 +368,7 @@ func UITooltip(msg string) {
 }
 
 func UICheckbox(id clay.ElementID, checked *bool, label string) {
-	clay.CLAY(clay.IDI("CheckboxWrapper", int(id.ID)), clay.EL{
+	clay.CLAY(id.With("CheckboxWrapper"), clay.EL{
 		Layout: clay.LAY{ChildGap: S1, ChildAlignment: YCENTER},
 	}, func() {
 		UIButton(id, UIButtonConfig{
@@ -377,7 +377,7 @@ func UICheckbox(id clay.ElementID, checked *bool, label string) {
 				PushHistory()
 			},
 		}, func() {
-			UIImage(clay.IDI("CheckIcon", int(id.ID)), util.Tern(*checked, ImgToggleDown, ImgToggleRight), clay.EL{})
+			UIImage(id.With("CheckIcon"), util.Tern(*checked, ImgToggleDown, ImgToggleRight), clay.EL{})
 		})
 		clay.TEXT(label, clay.TextElementConfig{TextColor: White})
 	})

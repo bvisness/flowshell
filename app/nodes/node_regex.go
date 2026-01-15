@@ -40,7 +40,7 @@ func (a *RegexMatchAction) UI(n *core.Node) {
 			Layout: clay.LAY{Sizing: core.GROWH, ChildAlignment: core.YCENTER},
 		}, func() {
 			core.UIInputPort(n, 0)
-			core.UISpacer(clay.AUTO_ID, core.GROWH)
+			core.UISpacer(clay.IDI("MatchSpacer1", n.ID), core.GROWH)
 			core.UIOutputPort(n, 0)
 		})
 		clay.CLAY(clay.IDI("Row2", n.ID), clay.EL{
@@ -125,7 +125,7 @@ func (a *RegexFindAllAction) UI(n *core.Node) {
 			Layout: clay.LAY{Sizing: core.GROWH, ChildAlignment: core.YCENTER},
 		}, func() {
 			core.UIInputPort(n, 0)
-			core.UISpacer(clay.AUTO_ID, core.GROWH)
+			core.UISpacer(clay.IDI("FindAllSpacer1", n.ID), core.GROWH)
 			core.UIOutputPort(n, 0)
 		})
 		clay.CLAY(clay.IDI("Row2", n.ID), clay.EL{
@@ -211,7 +211,7 @@ func (a *RegexReplaceAction) UI(n *core.Node) {
 			Layout: clay.LAY{Sizing: core.GROWH, ChildAlignment: core.YCENTER},
 		}, func() {
 			core.UIInputPort(n, 0)
-			core.UISpacer(clay.AUTO_ID, core.GROWH)
+			core.UISpacer(clay.IDI("ReplaceSpacer1", n.ID), core.GROWH)
 			core.UIOutputPort(n, 0)
 		})
 		clay.CLAY(clay.IDI("Row2", n.ID), clay.EL{
@@ -299,7 +299,7 @@ func (a *RegexSplitAction) UI(n *core.Node) {
 			Layout: clay.LAY{Sizing: core.GROWH, ChildAlignment: core.YCENTER},
 		}, func() {
 			core.UIInputPort(n, 0)
-			core.UISpacer(clay.AUTO_ID, core.GROWH)
+			core.UISpacer(clay.IDI("SplitSpacer1", n.ID), core.GROWH)
 			core.UIOutputPort(n, 0)
 		})
 		clay.CLAY(clay.IDI("Row2", n.ID), clay.EL{

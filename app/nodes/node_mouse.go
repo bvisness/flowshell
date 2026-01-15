@@ -3,9 +3,9 @@
 import (
 	"context"
 
+	"github.com/bvisness/flowshell/app/core"
 	"github.com/bvisness/flowshell/clay"
 	hook "github.com/robotn/gohook"
-	"github.com/bvisness/flowshell/app/core"
 )
 
 // GEN:NodeAction
@@ -35,14 +35,14 @@ func (a *GetMousePositionAction) UI(n *core.Node) {
 		clay.CLAY(clay.IDI("Row1", n.ID), clay.EL{
 			Layout: clay.LAY{Sizing: core.GROWH, ChildAlignment: core.YCENTER, ChildGap: core.S2},
 		}, func() {
-			core.UISpacer(clay.AUTO_ID, core.GROWH)
+			core.UISpacer(clay.IDI("PosSpacer1", n.ID), core.GROWH)
 			clay.TEXT("X", clay.TextElementConfig{TextColor: core.White})
 			core.UIOutputPort(n, 0)
 		})
 		clay.CLAY(clay.IDI("Row2", n.ID), clay.EL{
 			Layout: clay.LAY{Sizing: core.GROWH, ChildAlignment: core.YCENTER, ChildGap: core.S2},
 		}, func() {
-			core.UISpacer(clay.AUTO_ID, core.GROWH)
+			core.UISpacer(clay.IDI("PosSpacer2", n.ID), core.GROWH)
 			clay.TEXT("Y", clay.TextElementConfig{TextColor: core.White})
 			core.UIOutputPort(n, 1)
 		})
@@ -90,14 +90,14 @@ func (a *WaitForClickAction) UI(n *core.Node) {
 		clay.CLAY(clay.IDI("Row1", n.ID), clay.EL{
 			Layout: clay.LAY{Sizing: core.GROWH, ChildAlignment: core.YCENTER, ChildGap: core.S2},
 		}, func() {
-			core.UISpacer(clay.AUTO_ID, core.GROWH)
+			core.UISpacer(clay.IDI("ClickSpacer1", n.ID), core.GROWH)
 			clay.TEXT("X", clay.TextElementConfig{TextColor: core.White})
 			core.UIOutputPort(n, 0)
 		})
 		clay.CLAY(clay.IDI("Row2", n.ID), clay.EL{
 			Layout: clay.LAY{Sizing: core.GROWH, ChildAlignment: core.YCENTER, ChildGap: core.S2},
 		}, func() {
-			core.UISpacer(clay.AUTO_ID, core.GROWH)
+			core.UISpacer(clay.IDI("ClickSpacer2", n.ID), core.GROWH)
 			clay.TEXT("Y", clay.TextElementConfig{TextColor: core.White})
 			core.UIOutputPort(n, 1)
 		})
