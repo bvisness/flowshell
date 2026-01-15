@@ -164,6 +164,10 @@ func (a *HTTPRequestAction) RunContext(ctx context.Context, n *core.Node) <-chan
 			return
 		}
 
+		if core.DebugMode {
+			fmt.Printf("DEBUG: HTTP %s %s\n", method, urlStr)
+		}
+
 		var bodyReader io.Reader
 		if valBody, wired, err := n.GetInputValue(2); err == nil && wired {
 			if len(valBody.BytesValue) > 0 {
@@ -183,8 +187,14 @@ func (a *HTTPRequestAction) RunContext(ctx context.Context, n *core.Node) <-chan
 		client := &http.Client{}
 		resp, err := client.Do(req)
 		if err != nil {
+			if core.DebugMode {
+				fmt.Printf("DEBUG: HTTP Request Failed: %v\n", err)
+			}
 			done <- core.NodeActionResult{Err: fmt.Errorf("request failed: %v", err)}
 			return
+		}
+		if core.DebugMode {
+			fmt.Printf("DEBUG: HTTP Response Status: %s\n", resp.Status)
 		}
 		defer func() { _ = resp.Body.Close() }()
 

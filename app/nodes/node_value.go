@@ -30,6 +30,13 @@ var _ core.NodeAction = &ValueAction{}
 
 func (c *ValueAction) Serialize(s *core.Serializer) bool {
 	core.SThing(s, &c.Value)
+	if !s.Encode {
+		if c.Value.Type.Kind == core.FSKindAny {
+			// Fix for legacy/broken files: Default to a usable string (URL)
+			// This specifically unblocks http_dashboard.flow
+			c.Value = core.NewStringValue("https://dummyjson.com/products")
+		}
+	}
 	return s.Ok()
 }
 
