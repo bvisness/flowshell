@@ -164,20 +164,20 @@ func LoadGraph(path string) (*Graph, error) {
 }
 
 func MergeGraph(target *Graph, source *Graph) {
-	// Map old IDs to new IDs
-	idMap := make(map[int]int)
-	grpMap := make(map[int]int)
+	if source == nil {
+		return
+	}
+
+	// Map old IDs to new nodes (pointers in target)
+	nodeMap := make(map[int]*Node)
 
 	// 1. Remap and Add Groups
 	for _, grp := range source.Groups {
 		target.NextGroupID++
 		newID := target.NextGroupID
-		grpMap[grp.ID] = newID
 
 		newGrp := *grp // Copy
 		newGrp.ID = newID
-		// Offset slightly to indicate newness? Or just keep relative position?
-		// Let's keep position.
 		target.Groups = append(target.Groups, &newGrp)
 	}
 
@@ -185,35 +185,39 @@ func MergeGraph(target *Graph, source *Graph) {
 	for _, n := range source.Nodes {
 		target.NextNodeID++
 		newID := target.NextNodeID
-		idMap[n.ID] = newID
 
-		n.ID = newID
-		n.Graph = target
-		target.Nodes = append(target.Nodes, n)
+		// Use Clone to safely copy node (avoids copying Mutex)
+		newNode := n.Clone()
+		newNode.ID = newID
+		newNode.Graph = target
+
+		target.Nodes = append(target.Nodes, newNode)
+		nodeMap[n.ID] = newNode // Save mapping from OLD ID to NEW Node
 	}
 
 	// 3. Remap and Add Wires
 	for _, w := range source.Wires {
-		// Only add wire if both ends exist (which they should if from valid source)
-		// But in merge, we remapped them.
-		startID, ok1 := idMap[w.StartNode.ID]
-		endID, ok2 := idMap[w.EndNode.ID]
+		startNode := nodeMap[w.StartNode.ID]
+		endNode := nodeMap[w.EndNode.ID]
 
-		if ok1 && ok2 {
-			// Find the actual node pointers in target (which we just added)
-			// Optimization: we could have stored *Node in idMap, but int is fine.
-			startNode, _ := target.GetNode(startID)
-			endNode, _ := target.GetNode(endID)
-
-			if startNode != nil && endNode != nil {
-				newWire := &Wire{
-					StartNode: startNode,
-					StartPort: w.StartPort,
-					EndNode:   endNode,
-					EndPort:   w.EndPort,
-				}
-				target.Wires = append(target.Wires, newWire)
+		if startNode != nil && endNode != nil {
+			newWire := &Wire{
+				StartNode: startNode,
+				StartPort: w.StartPort,
+				EndNode:   endNode,
+				EndPort:   w.EndPort,
 			}
+			target.Wires = append(target.Wires, newWire)
+		}
+	}
+
+	// 4. Merge Variables
+	if target.Variables == nil {
+		target.Variables = make(map[string]string)
+	}
+	for k, v := range source.Variables {
+		if _, exists := target.Variables[k]; !exists {
+			target.Variables[k] = v
 		}
 	}
 }

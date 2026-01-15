@@ -20,6 +20,8 @@ func PushHistory() {
 	}
 }
 
+var DebugMode bool
+
 // Focus tracking
 var UIFocus *clay.ElementID
 var LastUIFocus clay.ElementID

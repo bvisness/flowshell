@@ -1,6 +1,7 @@
 package app
 
 import (
+	"flag"
 	"fmt"
 
 	"github.com/bvisness/flowshell/app/core"
@@ -16,6 +17,11 @@ const windowWidth = 1920
 var ShouldQuit bool
 
 func Main() {
+	// Parse CLI arguments
+	debugPtr := flag.Bool("debug", false, "Enable debug mode")
+	flag.Parse()
+	core.DebugMode = *debugPtr
+
 	CurrentSettings = LoadSettings()
 	core.ApplyTheme(CurrentSettings.Theme)
 
@@ -61,6 +67,43 @@ func Main() {
 		fmt.Printf("Error loading plugins: %v\n", err)
 	} else {
 		nodeTypes = append(nodeTypes, pluginNodes...)
+	}
+
+	// Load Initial Flows from CLI
+	flowFiles := flag.Args()
+	if len(flowFiles) > 0 {
+		var mergedGraph *core.Graph
+
+		for _, file := range flowFiles {
+			g, err := core.LoadGraph(file)
+			if err != nil {
+				fmt.Printf("Error loading flow file %s: %v\n", file, err)
+				continue
+			}
+			if mergedGraph == nil {
+				mergedGraph = g
+				CurrentFilename = file
+			} else {
+				fmt.Printf("Merging %s...\n", file)
+				core.MergeGraph(mergedGraph, g)
+			}
+		}
+
+		if mergedGraph != nil {
+			CurrentGraph = mergedGraph
+			selectedNodeID = 0
+			// Clear selection map if it exists, or just verify it's init
+			if SelectedNodes == nil {
+				SelectedNodes = make(map[int]struct{})
+			} else {
+				clear(SelectedNodes)
+			}
+
+			// If duplicate/merged, maybe clear filename to avoid overwriting first file
+			if len(flowFiles) > 1 {
+				CurrentFilename = ""
+			}
+		}
 	}
 
 	clay.SetMaxElementCount(1 << 16)

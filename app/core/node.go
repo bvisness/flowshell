@@ -111,6 +111,35 @@ func (n *Node) GetOutputState(portName string) *NodeOutputState {
 	return newState
 }
 
+func (n *Node) Clone() *Node {
+	newNode := &Node{
+		ID:                  n.ID,
+		Pos:                 n.Pos,
+		Name:                n.Name,
+		Pinned:              n.Pinned,
+		Action:              n.Action,
+		Valid:               n.Valid,
+		HandleSkippedInputs: n.HandleSkippedInputs,
+		// Runtime state (mu, Running, done, resultAvailable, result) is strictly ignored/zeroed
+		InputPortPositions:  nil, // Will be recalculated
+		OutputPortPositions: nil, // Will be recalculated
+		DragRect:            n.DragRect,
+		Graph:               n.Graph, // Will be updated by caller if needed
+		outputState:         nil,     // UI state reset
+	}
+
+	if n.InputPorts != nil {
+		newNode.InputPorts = make([]NodePort, len(n.InputPorts))
+		copy(newNode.InputPorts, n.InputPorts)
+	}
+	if n.OutputPorts != nil {
+		newNode.OutputPorts = make([]NodePort, len(n.OutputPorts))
+		copy(newNode.OutputPorts, n.OutputPorts)
+	}
+
+	return newNode
+}
+
 type NodePort struct {
 	Name string
 	Type FlowType
