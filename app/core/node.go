@@ -205,6 +205,7 @@ func (n *Node) Run(ctx context.Context, rerunInputs bool) <-chan struct{} {
 				} else {
 					err = fmt.Errorf("panic: %v\n%s", r, stack)
 				}
+				fmt.Printf("Node %s execution panicked: %v\n", n, err)
 				n.result = NodeActionResult{Err: err}
 				n.resultAvailable = true
 			}
@@ -217,7 +218,9 @@ func (n *Node) Run(ctx context.Context, rerunInputs bool) <-chan struct{} {
 		// Check context before starting
 		if ctx.Err() != nil {
 			n.mu.Lock()
-			n.result = NodeActionResult{Err: ctx.Err()}
+			err := ctx.Err()
+			fmt.Printf("Node %s ctx error: %v\n", n, err)
+			n.result = NodeActionResult{Err: err}
 			n.resultAvailable = true
 			n.mu.Unlock()
 			return
@@ -238,7 +241,9 @@ func (n *Node) Run(ctx context.Context, rerunInputs bool) <-chan struct{} {
 			case <-inputRun:
 			case <-ctx.Done():
 				n.mu.Lock()
-				n.result = NodeActionResult{Err: ctx.Err()}
+				err := ctx.Err()
+				fmt.Printf("Node %s timed out waiting for inputs: %v\n", n, err)
+				n.result = NodeActionResult{Err: err}
 				n.resultAvailable = true
 				n.mu.Unlock()
 				return
@@ -250,14 +255,18 @@ func (n *Node) Run(ctx context.Context, rerunInputs bool) <-chan struct{} {
 			res, ok := inputNode.GetResult()
 			if !ok {
 				n.mu.Lock()
-				n.result = NodeActionResult{Err: fmt.Errorf("input node %s produced no result", inputNode)}
+				err := fmt.Errorf("input node %s produced no result", inputNode)
+				fmt.Printf("Node %s input error: %v\n", n, err)
+				n.result = NodeActionResult{Err: err}
 				n.resultAvailable = true
 				n.mu.Unlock()
 				return
 			}
 			if res.Err != nil {
 				n.mu.Lock()
-				n.result = NodeActionResult{Err: fmt.Errorf("input node %s failed: %w", inputNode, res.Err)}
+				err := fmt.Errorf("input node %s failed: %w", inputNode, res.Err)
+				fmt.Printf("Node %s input error: %v\n", n, err)
+				n.result = NodeActionResult{Err: err}
 				n.resultAvailable = true
 				n.mu.Unlock()
 				return
@@ -299,9 +308,14 @@ func (n *Node) Run(ctx context.Context, rerunInputs bool) <-chan struct{} {
 
 		select {
 		case res := <-resCh:
+			if res.Err != nil {
+				fmt.Printf("Node %s action error: %v\n", n, res.Err)
+			}
 			if res.Err == nil && len(res.Outputs) != len(n.OutputPorts) {
 				n.mu.Lock()
-				n.result = NodeActionResult{Err: fmt.Errorf("bad num outputs for %s: got %d, expected %d", n, len(n.OutputPorts), len(res.Outputs))}
+				err := fmt.Errorf("bad num outputs for %s: got %d, expected %d", n, len(n.OutputPorts), len(res.Outputs))
+				fmt.Printf("Node %s output error: %v\n", n, err)
+				n.result = NodeActionResult{Err: err}
 				n.resultAvailable = true
 				n.mu.Unlock()
 				return
@@ -309,7 +323,9 @@ func (n *Node) Run(ctx context.Context, rerunInputs bool) <-chan struct{} {
 			for i, output := range res.Outputs {
 				if err := Typecheck(*output.Type, n.OutputPorts[i].Type); err != nil {
 					n.mu.Lock()
-					n.result = NodeActionResult{Err: fmt.Errorf("bad value type for %s output port %d: %v", n, i, err)}
+					wrappedErr := fmt.Errorf("bad value type for %s output port %d: %v", n, i, err)
+					fmt.Printf("Node %s typecheck error: %v\n", n, wrappedErr)
+					n.result = NodeActionResult{Err: wrappedErr}
 					n.resultAvailable = true
 					n.mu.Unlock()
 					return
@@ -321,7 +337,9 @@ func (n *Node) Run(ctx context.Context, rerunInputs bool) <-chan struct{} {
 			n.mu.Unlock()
 		case <-ctx.Done():
 			n.mu.Lock()
-			n.result = NodeActionResult{Err: ctx.Err()}
+			err := ctx.Err()
+			fmt.Printf("Node %s timed out during execution: %v\n", n, err)
+			n.result = NodeActionResult{Err: err}
 			n.resultAvailable = true
 			n.mu.Unlock()
 		}
