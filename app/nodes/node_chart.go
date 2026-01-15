@@ -286,7 +286,7 @@ func (c *LineChartAction) UI(n *core.Node) {
 		}
 	}
 
-	clay.CLAY(n.ClayID(), clay.EL{
+	clay.CLAY(clay.IDI("ChartContent", n.ID), clay.EL{
 		Layout: clay.LAY{LayoutDirection: clay.TopToBottom, Sizing: clay.Sizing{Width: clay.SizingFixed(c.Width)}, ChildGap: core.S2},
 	}, func() {
 		clay.CLAY(clay.IDI("Settings", n.ID), clay.EL{Layout: clay.LAY{Sizing: core.GROWH, ChildGap: core.S2, ChildAlignment: core.YCENTER}}, func() {
@@ -465,7 +465,7 @@ func (c *BarChartAction) UI(n *core.Node) {
 		}
 	}
 
-	clay.CLAY(n.ClayID(), clay.EL{
+	clay.CLAY(clay.IDI("ChartContent", n.ID), clay.EL{
 		Layout: clay.LAY{LayoutDirection: clay.TopToBottom, Sizing: clay.Sizing{Width: clay.SizingFixed(c.Width)}, ChildGap: core.S2},
 	}, func() {
 		clay.CLAY(clay.IDI("Settings", n.ID), clay.EL{Layout: clay.LAY{Sizing: core.GROWH, ChildGap: core.S2, ChildAlignment: core.YCENTER}}, func() {
@@ -644,7 +644,7 @@ func (c *ScatterPlotAction) UI(n *core.Node) {
 		}
 	}
 
-	clay.CLAY(n.ClayID(), clay.EL{
+	clay.CLAY(clay.IDI("ChartContent", n.ID), clay.EL{
 		Layout: clay.LAY{LayoutDirection: clay.TopToBottom, Sizing: clay.Sizing{Width: clay.SizingFixed(c.Width)}, ChildGap: core.S2},
 	}, func() {
 		clay.CLAY(clay.IDI("Settings", n.ID), clay.EL{Layout: clay.LAY{Sizing: core.GROWH, ChildGap: core.S2, ChildAlignment: core.YCENTER}}, func() {
