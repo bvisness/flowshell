@@ -1,10 +1,9 @@
 package util
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
-
-	"golang.org/x/exp/constraints"
 )
 
 func Tern[T any](cond bool, a, b T) T {
@@ -51,7 +50,7 @@ func Assert(cond bool, msgAndArgs ...any) {
 	}
 }
 
-func Min[T constraints.Ordered](a, b T) T {
+func Min[T cmp.Ordered](a, b T) T {
 	if a < b {
 		return a
 	} else {
@@ -59,7 +58,7 @@ func Min[T constraints.Ordered](a, b T) T {
 	}
 }
 
-func Max[T constraints.Ordered](a, b T) T {
+func Max[T cmp.Ordered](a, b T) T {
 	if a > b {
 		return a
 	} else {
